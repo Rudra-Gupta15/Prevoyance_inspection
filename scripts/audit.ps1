@@ -1,23 +1,56 @@
 # ==============================================================================
 #                 NSDL WORKSTATION COMPLIANCE AUDIT SCRIPT
 # ==============================================================================
-# Version: 1.2.0
+# Version: 2.1.0
 
 Write-Host "Collecting Workstation Compliance Data..." -ForegroundColor Green
 
+function Get-SafeString {
+    param(
+        [Parameter(Mandatory = $false)] $Value,
+        [string] $Fallback = "Unknown"
+    )
+
+    if ($null -eq $Value) {
+        return $Fallback
+    }
+
+    if ($Value -is [array]) {
+        $joined = ($Value | ForEach-Object { [string]$_ }) -join ", "
+        if ([string]::IsNullOrWhiteSpace($joined)) {
+            return $Fallback
+        }
+        return $joined
+    }
+
+    $text = [string]$Value
+    if ([string]::IsNullOrWhiteSpace($text)) {
+        return $Fallback
+    }
+    return $text
+}
+
+$executionDateTime = Get-Date -Format "dd-MMM-yyyy_HH:mm:ss"
+$consentText = "We provide approval to NSDL e-Governance Infrastructure Ltd.(NSDL e-Gov) to capture the details regarding the System details and share the details with NSDL e-Gov."
+
 # 1. Computer Name
-$computer = $env:COMPUTERNAME
+$computer = Get-SafeString $env:COMPUTERNAME "Unknown"
 
 # 2. OS Details
-$os = Get-CimInstance Win32_OperatingSystem
-$osName = $os.Caption
-$osVersion = $os.Version
-$architecture = $os.OSArchitecture
+$osName = "Unknown"
+$osVersion = "Unknown"
+$architecture = "Unknown"
+try {
+    $os = Get-CimInstance Win32_OperatingSystem -ErrorAction Stop
+    $osName = Get-SafeString $os.Caption "Unknown"
+    $osVersion = Get-SafeString $os.Version "Unknown"
+    $architecture = Get-SafeString $os.OSArchitecture "Unknown"
+} catch {}
 
 # 3. License Status Check
 $licenseStatus = "Unknown"
 try {
-    $sls = Get-CimInstance SoftwareLicensingProduct | Where-Object { $_.PartialProductKey -and $_.ApplicationID -eq "55c92734-d682-4d71-983e-d6ec3f16059f" } | Select-Object -First 1
+    $sls = Get-CimInstance SoftwareLicensingProduct -ErrorAction Stop | Where-Object { $_.PartialProductKey -and $_.ApplicationID -eq "55c92734-d682-4d71-983e-d6ec3f16059f" } | Select-Object -First 1
     if ($sls) {
         $statusMap = @{
             0 = "Unlicensed"
@@ -28,16 +61,70 @@ try {
             5 = "Notification"
             6 = "ExtendedGrace"
         }
-        $licenseStatus = $statusMap[[int]$sls.LicenseStatus]
+        $licenseStatus = Get-SafeString $statusMap[[int]$sls.LicenseStatus] "Unknown"
     }
 } catch {
     $licenseStatus = "Licensed (WMI Bypass)"
 }
 
-# 4. Antivirus Products
+# 4. Windows Update / Hotfix Details
+$hotfixes = @()
+try {
+    $hfObjects = Get-HotFix -ErrorAction Stop
+    foreach ($hf in $hfObjects) {
+        $installedOn = ""
+        if ($hf.InstalledOn) {
+            $installedOn = $hf.InstalledOn.ToString("M/d/yyyy")
+        }
+
+        $hotfixes += @{
+            caption = Get-SafeString $hf.Caption ""
+            cs_name = Get-SafeString $hf.CSName $computer
+            description = Get-SafeString $hf.Description ""
+            fix_id = Get-SafeString $hf.HotFixID ""
+            installed_on = Get-SafeString $installedOn ""
+        }
+    }
+} catch {}
+
+# 5. MAC Address
+$mac = "Unknown"
+try {
+    $macValue = Get-NetAdapter -ErrorAction Stop | Where-Object { $_.Status -eq "Up" } | Select-Object -First 1 -ExpandProperty MacAddress
+    $mac = (Get-SafeString $macValue "Unknown" -replace '[:-]', '').ToUpper()
+} catch {}
+
+# 6. CDROM / DVD Drive Check
+$driveName = "No CD Unit Found"
+try {
+    $cdrom = Get-CimInstance Win32_CDROMDrive -ErrorAction Stop
+    if ($cdrom) {
+        $driveNames = @($cdrom | ForEach-Object { $_.Name } | Where-Object { $_ })
+        $driveName = Get-SafeString $driveNames "No CD Unit Found"
+    }
+} catch {}
+
+# 7. Compression Utility Details
+$compressionUtilities = @()
+try {
+    $registryPaths = @(
+        "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*",
+        "HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*",
+        "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*"
+    )
+
+    $compressionUtilities = Get-ItemProperty $registryPaths -ErrorAction SilentlyContinue |
+        Where-Object { $_.DisplayName -match "7-Zip|WinRAR|WinZip|PeaZip|Bandizip|Zipware|PowerArchiver" } |
+        Select-Object -ExpandProperty DisplayName -Unique
+} catch {}
+if ($compressionUtilities.Count -eq 0) {
+    $compressionUtilities = @("No compression utility found")
+}
+
+# 8. Antivirus Products
 $antivirus = @()
 try {
-    $avProducts = Get-CimInstance -Namespace root/SecurityCenter2 -ClassName AntivirusProduct
+    $avProducts = Get-CimInstance -Namespace root/SecurityCenter2 -ClassName AntivirusProduct -ErrorAction Stop
     foreach ($av in $avProducts) {
         if ($av.displayName) {
             $antivirus += $av.displayName
@@ -48,52 +135,41 @@ if ($antivirus.Count -eq 0) {
     $antivirus = @("Windows Defender")
 }
 
-# 5. MAC Address
-$mac = "Unknown"
+# 9. Connected Printer Details
+$printers = @()
 try {
-    $mac = Get-NetAdapter | Where-Object { $_.Status -eq "Up" } | Select-Object -First 1 -ExpandProperty MacAddress
-    # Clean MAC format (remove colons or dashes if present, make uppercase)
-    $mac = ($mac -replace '[:-]', '').ToUpper()
-} catch {}
-
-# 6. CDROM / DVD Drive Check
-$driveName = "No CD Unit Found"
-try {
-    $cdrom = Get-CimInstance Win32_CDROMDrive
-    if ($cdrom -and $cdrom.Name) {
-        $driveName = $cdrom.Name
+    $printerObjects = Get-CimInstance Win32_Printer -ErrorAction Stop
+    foreach ($p in $printerObjects) {
+        $printers += @{
+            name = Get-SafeString $p.Name "Unknown"
+            system_name = Get-SafeString $p.SystemName $computer
+            enable_bidi = Get-SafeString $p.EnableBIDI "False"
+            extended_printer_status = Get-SafeString $p.ExtendedPrinterStatus "0"
+            port_name = Get-SafeString $p.PortName "Unknown"
+        }
     }
 } catch {}
 
-# 7. Connected Printers
-$printers = @()
-try {
-    $printers = Get-Printer | Select-Object -ExpandProperty Name
-} catch {}
-
-# 8. Installed Hotfixes
-$hotfixes = @()
-try {
-    $hotfixes = Get-HotFix | Select-Object -ExpandProperty HotFixID
-} catch {}
-
-# 9. Construct JSON Data payload
+# 10. Construct JSON Data payload
 $data = @{
-    computer_name  = $computer
-    os_name        = $osName
-    os_version     = $osVersion
-    architecture   = $architecture
-    license_status = $licenseStatus
-    antivirus      = $antivirus
-    mac_address    = $mac
-    drive_name     = $driveName
-    printers       = $printers
-    hotfixes       = $hotfixes
+    execution_datetime    = $executionDateTime
+    consent               = $consentText
+    computer_name         = $computer
+    os_name               = $osName
+    os_version            = $osVersion
+    architecture          = $architecture
+    license_status        = $licenseStatus
+    hotfixes              = $hotfixes
+    mac_address           = $mac
+    drive_name            = $driveName
+    compression_utilities = $compressionUtilities
+    antivirus             = $antivirus
+    printers              = $printers
 }
 
-$json = $data | ConvertTo-Json -Depth 5
+$json = $data | ConvertTo-Json -Depth 6
 
-# Capture dynamic client id parameter from filename if injected
+# Capture dynamic client id parameter from backend injection
 $client_id = "CLIENT_ID_PLACEHOLDER"
 
 # API URL (dynamically replaced by backend during serving)
@@ -105,4 +181,7 @@ try {
     Write-Host "Audit upload completed successfully!" -ForegroundColor Green
 } catch {
     Write-Host "Upload failed: $_" -ForegroundColor Red
+    if ($_.ErrorDetails.Message) {
+        Write-Host $_.ErrorDetails.Message -ForegroundColor Red
+    }
 }

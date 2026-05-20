@@ -516,10 +516,42 @@
                         if (data.status === 'completed') {
                             clearInterval(pollInterval);
                             showSuccessState();
+                        } else if (data.status === 'failed') {
+                            clearInterval(pollInterval);
+                            showFailedState(data.error || 'Audit failed. Please run the scan again.');
                         }
                     })
-                    .catch(err => logger.error('Polling error:', err));
+                    .catch(err => console.error('Polling error:', err));
             }, 2000);
+        }
+
+        function showFailedState(message) {
+            const statusBadge = document.getElementById('statusBadge');
+            const statusDot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+            const processingView = document.getElementById('processingView');
+            const safeMessage = message.replace(/[&<>"']/g, char => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;'
+            }[char]));
+
+            statusBadge.style.background = 'rgba(239, 68, 68, 0.15)';
+            statusBadge.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+            statusBadge.style.color = '#f87171';
+            statusDot.style.backgroundColor = '#f87171';
+            statusText.innerText = 'Audit Failed';
+
+            processingView.innerHTML = `
+                <h1 style="background: linear-gradient(135deg, #ffffff 30%, #f87171 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; font-size: 26px;">
+                    Audit Failed
+                </h1>
+                <p class="subtitle" style="margin-top: 8px; margin-bottom: 24px; font-size: 13px;">
+                    ${safeMessage}
+                </p>
+            `;
         }
 
         function showSuccessState() {
