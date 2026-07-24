@@ -352,9 +352,11 @@ $client_id = "CLIENT_ID_PLACEHOLDER"
 # API URL (dynamically replaced by backend during serving)
 $apiUrl = "http://127.0.0.1:8000/upload-audit?client_id=$client_id"
 
+$jsonBytes = [System.Text.Encoding]::UTF8.GetBytes($json)
+
 Write-Host "Uploading secure payload to backend..." -ForegroundColor Yellow
 try {
-    $res = Invoke-RestMethod -Uri $apiUrl -Method POST -Body $json -ContentType "application/json"
+    $res = Invoke-RestMethod -Uri $apiUrl -Method POST -Body $jsonBytes -ContentType "application/json; charset=utf-8"
     Write-Host "Audit upload completed successfully!" -ForegroundColor Green
 } catch {
     Write-Host "Upload failed: $_" -ForegroundColor Red

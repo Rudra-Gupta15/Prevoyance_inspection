@@ -611,10 +611,10 @@
          TAB 1: COMPLIANCE AUDIT
     ───────────────────────────────────────────────────────────────── -->
     <div class="tab-panel active" id="panel-audit" role="tabpanel">
-        <div style="display:grid; grid-template-columns:1fr 300px; gap:24px; align-items:start;">
+        <div style="display:grid; grid-template-columns:1fr 1fr; max-width:960px; margin:0 auto; gap:32px; align-items:stretch;">
 
             <!-- Left: Dynamic Flow -->
-            <div class="card" id="auditMainPanel" style="min-height:460px;">
+            <div class="card" id="auditMainPanel" style="min-height:480px;">
 
                 <!-- Setup View -->
                 <div id="setupView">
@@ -626,7 +626,7 @@
                         </div>
                     </div>
 
-                    <div class="form-grid" style="margin-bottom:20px;">
+                    <div style="display:flex; flex-direction:column; gap:16px; margin-bottom:20px;">
                         <div class="form-group">
                             <label for="branchName">Branch Name</label>
                             <input type="text" id="branchName" class="input-field" placeholder="e.g. RELIGARE BROKING LIMITED" value="RELIGARE BROKING LIMITED">
@@ -635,11 +635,11 @@
                             <label for="branchCode">Branch Code</label>
                             <input type="text" id="branchCode" class="input-field" placeholder="e.g. 8301231" value="8301231">
                         </div>
-                        <div class="form-group col-span-2">
+                        <div class="form-group">
                             <label for="officerName">Officer Name</label>
                             <input type="text" id="officerName" class="input-field" placeholder="e.g. SANDIP BALIRAM LOKHANDE" value="SANDIP BALIRAM LOKHANDE">
                         </div>
-                        <div class="form-group col-span-2">
+                        <div class="form-group">
                             <label for="osSelection">Target Operating System</label>
                             <select id="osSelection" class="input-field" onchange="updateDownloadUrl()">
                                 <option value="windows" selected>🪟 Windows</option>
@@ -698,50 +698,50 @@
             </div>
 
             <!-- Right: Instructions -->
-            <div class="card" style="background:var(--surface-2);">
-                <div class="section-title">💡 Quick Steps</div>
-                <div style="display:flex; flex-direction:column; gap:20px;">
-                    <div style="display:flex; gap:12px; align-items:flex-start;">
-                        <div style="width:24px; height:24px; border-radius:50%; background:var(--primary); color:white; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; flex-shrink:0;">1</div>
-                        <div style="font-size:13px; color:var(--text-2); line-height:1.6;">Verify or adjust the branch configuration on the left.</div>
+            <div class="card" style="background:var(--surface-2); padding:32px;">
+                <div class="section-title" style="color:var(--primary); font-weight:700;">💡 Quick Steps</div>
+                <div style="display:flex; flex-direction:column; gap:22px;">
+                    <div style="display:flex; gap:16px; align-items:flex-start;">
+                        <div style="width:28px; height:28px; border-radius:50%; background:rgba(37,99,235,0.1); color:var(--primary); display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; flex-shrink:0;">1</div>
+                        <div style="font-size:13.5px; color:var(--text-2); line-height:1.5;">Verify or adjust the branch configuration on the left.</div>
                     </div>
-                    <div style="display:flex; gap:12px; align-items:flex-start;">
-                        <div style="width:24px; height:24px; border-radius:50%; background:var(--primary); color:white; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; flex-shrink:0;">2</div>
-                        <div style="font-size:13px; color:var(--text-2); line-height:1.6;">Click <b>Start Compliance Audit</b> to download the secure launcher.</div>
+                    <div style="display:flex; gap:16px; align-items:flex-start;">
+                        <div style="width:28px; height:28px; border-radius:50%; background:rgba(37,99,235,0.1); color:var(--primary); display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; flex-shrink:0;">2</div>
+                        <div style="font-size:13.5px; color:var(--text-2); line-height:1.5;">Click <b>Start Compliance Audit</b> to download the secure launcher.</div>
                     </div>
-                    <div style="display:flex; gap:12px; align-items:flex-start;">
-                        <div style="width:24px; height:24px; border-radius:50%; background:var(--primary); color:white; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; flex-shrink:0;">3</div>
-                        <div style="font-size:13px; color:var(--text-2); line-height:1.6;">Run the downloaded file. It collects extended hardware, software inventory, and compliance data.</div>
+                    <div style="display:flex; gap:16px; align-items:flex-start;">
+                        <div style="width:28px; height:28px; border-radius:50%; background:rgba(37,99,235,0.1); color:var(--primary); display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; flex-shrink:0;">3</div>
+                        <div style="font-size:13.5px; color:var(--text-2); line-height:1.5;">Run the downloaded file. It collects extended hardware, software inventory, and compliance data.</div>
                     </div>
-                    <div style="display:flex; gap:12px; align-items:flex-start;">
-                        <div style="width:24px; height:24px; border-radius:50%; background:var(--success); color:white; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; flex-shrink:0;">4</div>
-                        <div style="font-size:13px; color:var(--text-2); line-height:1.6;">This page updates automatically with PDF &amp; XML download links.</div>
+                    <div style="display:flex; gap:16px; align-items:flex-start;">
+                        <div style="width:28px; height:28px; border-radius:50%; background:rgba(16,185,129,0.1); color:var(--success); display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; flex-shrink:0;">4</div>
+                        <div style="font-size:13.5px; color:var(--text-2); line-height:1.5;">This page updates automatically with PDF &amp; XML download links.</div>
                     </div>
                 </div>
 
-                <hr class="divider">
-                <div class="section-title">📊 Data Collected</div>
-                <div style="display:flex; flex-direction:column; gap:8px;">
-                    <div style="display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--text-2);">
-                        <span>✅</span> OS, License &amp; Updates
+                <hr class="divider" style="margin:28px 0;">
+                <div class="section-title" style="color:var(--text); font-weight:700;">📊 Data Collected</div>
+                <div style="display:flex; flex-direction:column; gap:12px;">
+                    <div style="display:flex; align-items:center; gap:12px; font-size:13.5px; color:var(--text-2);">
+                        <span style="color:var(--success); font-size:16px;">✓</span> OS, License &amp; Updates
                     </div>
-                    <div style="display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--text-2);">
-                        <span>✅</span> CPU, RAM, Disk, GPU
+                    <div style="display:flex; align-items:center; gap:12px; font-size:13.5px; color:var(--text-2);">
+                        <span style="color:var(--success); font-size:16px;">✓</span> CPU, RAM, Disk, GPU
                     </div>
-                    <div style="display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--text-2);">
-                        <span>✅</span> Serial No. &amp; Manufacturer
+                    <div style="display:flex; align-items:center; gap:12px; font-size:13.5px; color:var(--text-2);">
+                        <span style="color:var(--success); font-size:16px;">✓</span> Serial No. &amp; Manufacturer
                     </div>
-                    <div style="display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--text-2);">
-                        <span>✅</span> Network Adapters &amp; Config
+                    <div style="display:flex; align-items:center; gap:12px; font-size:13.5px; color:var(--text-2);">
+                        <span style="color:var(--success); font-size:16px;">✓</span> Network Adapters &amp; Config
                     </div>
-                    <div style="display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--text-2);">
-                        <span>✅</span> Disk Partitions &amp; Peripherals
+                    <div style="display:flex; align-items:center; gap:12px; font-size:13.5px; color:var(--text-2);">
+                        <span style="color:var(--success); font-size:16px;">✓</span> Disk Partitions &amp; Peripherals
                     </div>
-                    <div style="display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--text-2);">
-                        <span>✅</span> Full Software Inventory
+                    <div style="display:flex; align-items:center; gap:12px; font-size:13.5px; color:var(--text-2);">
+                        <span style="color:var(--success); font-size:16px;">✓</span> Full Software Inventory
                     </div>
-                    <div style="display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--text-2);">
-                        <span>✅</span> Antivirus, Printers, Hotfixes
+                    <div style="display:flex; align-items:center; gap:12px; font-size:13.5px; color:var(--text-2);">
+                        <span style="color:var(--success); font-size:16px;">✓</span> Antivirus, Printers, Hotfixes
                     </div>
                 </div>
             </div>
@@ -1177,6 +1177,57 @@
             </div>
         </div>
 
+    </div>
+    <!-- ─────────────────────────────────────────────────────────────
+         REMOTE AUDIT MODAL
+    ───────────────────────────────────────────────────────────────── -->
+    <div id="remoteAuditModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
+        <div class="card" style="width:100%; max-width:450px; padding:24px; position:relative;">
+            <button onclick="closeRemoteAuditModal()" style="position:absolute; right:16px; top:16px; background:none; border:none; font-size:18px; cursor:pointer; color:var(--muted);">&times;</button>
+            <div style="display:flex; align-items:center; gap:12px; margin-bottom:20px;">
+                <div class="card-icon green">⚡</div>
+                <div>
+                    <h3 style="margin:0; font-size:16px; font-weight:600;">Send Notification</h3>
+                    <p style="margin:0; font-size:13px; color:var(--muted);" id="remoteAuditTarget">Target: </p>
+                </div>
+            </div>
+
+            <div style="display:flex; flex-direction:column; gap:16px;">
+                <input type="hidden" id="remoteAuditIp">
+                
+                <div class="form-group">
+                    <label>Notification Message</label>
+                    <input type="text" id="remoteAuditMsg" class="input-field" value="IT Compliance Audit Required">
+                </div>
+
+                <div class="form-group">
+                    <label>Execution Method</label>
+                    <select id="remoteAuditMethod" class="input-field">
+                        <option value="auto">Auto (Try WinRM, then PsExec)</option>
+                        <option value="winrm">WinRM (PowerShell Remoting)</option>
+                        <option value="psexec">PsExec (SMB/RPC)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Administrator Username</label>
+                    <input type="text" id="remoteAuditUser" class="input-field" placeholder="DOMAIN\Administrator or .\Admin">
+                </div>
+
+                <div class="form-group">
+                    <label>Administrator Password</label>
+                    <input type="password" id="remoteAuditPwd" class="input-field" placeholder="••••••••">
+                </div>
+
+                <div id="remoteAuditStatus" style="display:none; font-size:13px; padding:10px; border-radius:6px;"></div>
+
+                <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:8px;">
+                    <button class="btn btn-outline" onclick="copyAuditCommand()" style="margin-right:auto;">📋 Copy Manual Command</button>
+                    <button class="btn btn-outline" onclick="closeRemoteAuditModal()">Cancel</button>
+                    <button class="btn btn-primary" id="btnSubmitRemoteAudit" onclick="submitRemoteAudit()">▶ Send Notification</button>
+                </div>
+            </div>
+        </div>
     </div>
 
 </main>
@@ -1713,6 +1764,10 @@ async function fetchCurrentWifiStatus() {
         const data = await r.json();
         const statusEl = document.getElementById('wifiCurrentStatus');
         if (!data) return;
+        
+        if (data.ip) {
+            window.serverPrivateIp = data.ip;
+        }
 
         if (data.connected && data.ssid) {
             statusEl.innerHTML = `
@@ -1904,7 +1959,7 @@ function renderWifiDevices(devices) {
             
         const actionBtn = isAudited 
             ? `<button class="btn btn-outline btn-sm" onclick="switchTab('software'); setTimeout(()=> {document.getElementById('deviceSelector').value='${esc(d.computer_name)}'; loadSoftwareForDevice();}, 300)">View Software</button>`
-            : `<button class="btn btn-primary btn-sm" onclick="switchTab('audit')">Run Audit</button>`;
+            : `<button class="btn btn-primary btn-sm" onclick="openRemoteAuditModal('${esc(d.ip)}')">Send Notification</button>`;
             
         return `
         <tr class="scan-result-enter">
@@ -1941,6 +1996,106 @@ function exportWifiCSV() {
         rows.push([d.ip, hostname, d.username, d.os_name, d.audit_status, (d.port_labels||[]).join('; ')]);
     });
     downloadCSV(rows, 'wifi_devices.csv');
+}
+
+// ────────────────────────────────────────────────────────────────────
+//  REMOTE AUDIT EXECUTION
+// ────────────────────────────────────────────────────────────────────
+function openRemoteAuditModal(ip) {
+    document.getElementById('remoteAuditIp').value = ip;
+    document.getElementById('remoteAuditTarget').textContent = `Target: ${ip}`;
+    document.getElementById('remoteAuditPwd').value = '';
+    document.getElementById('remoteAuditStatus').style.display = 'none';
+    
+    const modal = document.getElementById('remoteAuditModal');
+    modal.style.display = 'flex';
+}
+
+function closeRemoteAuditModal() {
+    document.getElementById('remoteAuditModal').style.display = 'none';
+}
+
+function copyAuditCommand() {
+    let host = window.location.host;
+    if ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && window.serverPrivateIp) {
+        const port = window.location.port ? ':' + window.location.port : '';
+        host = window.serverPrivateIp + port;
+    }
+    const serverUrl = window.location.protocol + "//" + host;
+    const clientId = new URLSearchParams(window.location.search).get('client_id') || 'manual_audit';
+    const scriptUrl = `${serverUrl}/api/get-audit-script?client_id=${clientId}`;
+    const cmd = `powershell -c "Invoke-WebRequest -Uri '${scriptUrl}' -OutFile '$env:TEMP\\audit.ps1'; & '$env:TEMP\\audit.ps1'"`;
+    navigator.clipboard.writeText(cmd).then(() => {
+        alert("Command copied to clipboard!\n\nYou can now paste this command directly into PowerShell on the target PC to run the audit manually.");
+    }).catch(err => {
+        alert("Failed to copy command: " + err);
+    });
+}
+
+async function submitRemoteAudit() {
+    const ip = document.getElementById('remoteAuditIp').value;
+    const msg = document.getElementById('remoteAuditMsg').value;
+    const method = document.getElementById('remoteAuditMethod').value;
+    const user = document.getElementById('remoteAuditUser').value.trim();
+    const pwd = document.getElementById('remoteAuditPwd').value;
+    const btn = document.getElementById('btnSubmitRemoteAudit');
+    const statusEl = document.getElementById('remoteAuditStatus');
+
+    if (!user || !pwd) {
+        alert("Please provide administrator credentials.");
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = "⏳ Sending...";
+    
+    statusEl.style.display = 'block';
+    statusEl.style.backgroundColor = 'var(--info-bg)';
+    statusEl.style.color = 'var(--info-text)';
+    statusEl.innerHTML = `<span class="spinner" style="width:14px; height:14px; display:inline-block; margin-right:8px; vertical-align:middle;"></span> Connecting to ${ip}...`;
+
+    try {
+        const serverUrl = window.location.protocol + "//" + window.location.host;
+        const res = await fetch('/audit/send-notification', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                ip_address: ip,
+                username: user,
+                password: pwd,
+                method: method,
+                message: msg,
+                server_url: serverUrl
+            })
+        });
+
+        const data = await res.json();
+
+        if (res.ok) {
+            statusEl.style.backgroundColor = 'var(--success-bg)';
+            statusEl.style.color = 'var(--success-text)';
+            statusEl.innerHTML = `✅ <b>Notification Sent!</b> User was prompted via ${data.method}.`;
+            
+            // Re-scan network to reflect updated audit status
+            setTimeout(() => {
+                closeRemoteAuditModal();
+                rescanWifiDevices();
+                loadAssets(); // also refresh main assets table
+            }, 2000);
+            
+        } else {
+            statusEl.style.backgroundColor = 'var(--danger-bg)';
+            statusEl.style.color = 'var(--danger-text)';
+            statusEl.innerHTML = `❌ <b>Failed:</b> ${esc(data.detail?.message || data.detail || "Unknown error")}`;
+        }
+    } catch (e) {
+        statusEl.style.backgroundColor = 'var(--danger-bg)';
+        statusEl.style.color = 'var(--danger-text)';
+        statusEl.innerHTML = `❌ <b>Network Error:</b> ${esc(e.message)}`;
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = "▶ Send Notification";
+    }
 }
 
 // Initial fetch for wifi tab
