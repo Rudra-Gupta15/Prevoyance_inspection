@@ -232,6 +232,7 @@ class AuditData(BaseModel):
     network_details: List[Union[NetworkDetails, dict, str]] = []
     user_accounts: List[Union[UserAccount, dict, str]] = []
     software_inventory: List[Union[SoftwareEntry, dict]] = []
+    login_history: List[dict] = []
 
     @validator(
         "execution_datetime", "consent", "computer_name", "os_name",
@@ -1051,6 +1052,16 @@ def get_software_for_device(computer_name: str):
         "last_audit":         latest_ts,
         "software_inventory": latest_data.get("software_inventory", []),
         "total":              len(latest_data.get("software_inventory", [])),
+        "os_name":            latest_data.get("os_name", ""),
+        "os_version":         latest_data.get("os_version", ""),
+        "architecture":       latest_data.get("architecture", ""),
+        "license_status":     latest_data.get("license_status", ""),
+        "hardware_details":   latest_data.get("hardware_details", {}),
+        "network_details":    latest_data.get("network_details", []),
+        "user_accounts":      latest_data.get("user_accounts", []),
+        "login_history":      latest_data.get("login_history", []),
+        "hotfixes":           latest_data.get("hotfixes", []),
+        "antivirus":          latest_data.get("antivirus", "")
     }
 
 
@@ -1124,10 +1135,101 @@ def network_scan(request: NetworkScanRequest):
         return None
 
     logger.info(f"Starting network scan: {request.ip_range}")
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Step 1: Fast ICMP Ping Sweep — populates ARP cache for ALL live devices
+    # including mobiles and firewalled laptops that block TCP ports.
+    # ─────────────────────────────────────────────────────────────────────────
+    def ping_host(ip_str: str):
+        try:
+            subprocess.run(
+                ["ping", "-n", "1", "-w", "500", str(ip_str)],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=1
+            )
+        except Exception:
+            pass
+
+    logger.info("Running ping sweep to populate ARP cache...")
+    with concurrent.futures.ThreadPoolExecutor(max_workers=128) as executor:
+        executor.map(ping_host, [str(h) for h in hosts])
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Step 2: Port Scan — identifies Windows/Linux/printer devices by open ports
+    # ─────────────────────────────────────────────────────────────────────────
     with concurrent.futures.ThreadPoolExecutor(max_workers=64) as executor:
         results = list(executor.map(scan_host, hosts))
 
-    discovered = [r for r in results if r is not None]
+    discovered_dict = {r["ip"]: r for r in results if r is not None}
+
+    
+    # ────────────────────────────────────────────────────────────────────────────
+    # ARP Fallback: Discover mobile phones and firewalled devices
+    # ────────────────────────────────────────────────────────────────────────────
+    try:
+        broadcast_ip  = str(network.broadcast_address)
+        network_ip    = str(network.network_address)
+        BROADCAST_MACS = {"ff-ff-ff-ff-ff-ff", "ff:ff:ff:ff:ff:ff", "00-00-00-00-00-00"}
+
+        arp_out, _ = _run_cmd("arp -a")
+        for line in arp_out.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            parts = line.split()
+            if len(parts) < 3:
+                continue
+            entry_type = parts[2].lower() if len(parts) >= 3 else ""
+            if entry_type not in ("dynamic", "static"):
+                continue
+            ip_str  = parts[0]
+            mac_str = parts[1].lower()
+
+            # Skip broadcast, network, and invalid MACs
+            if ip_str in (broadcast_ip, network_ip):
+                continue
+            if mac_str in BROADCAST_MACS:
+                continue
+
+            try:
+                if ipaddress.IPv4Address(ip_str) not in network:
+                    continue
+                if ip_str in discovered_dict:
+                    continue
+
+                hostname = ip_str
+                try:
+                    resolved = socket.getfqdn(ip_str)
+                    if resolved != ip_str:
+                        hostname = resolved
+                except Exception:
+                    pass
+
+                # Guess device type by hostname pattern
+                h_lower = hostname.lower()
+                if any(x in h_lower for x in ["desktop", "laptop", "pc", "workstation", "win"]):
+                    dev_type = "Windows Host (Firewalled)"
+                elif any(x in h_lower for x in ["android", "iphone", "ipad", "samsung", "pixel"]):
+                    dev_type = "Mobile Device"
+                else:
+                    dev_type = "Unknown Device (Firewalled)"
+
+                discovered_dict[ip_str] = {
+                    "ip":          ip_str,
+                    "hostname":    hostname if hostname != ip_str else "N/A",
+                    "open_ports":  [],
+                    "port_labels": [f"MAC: {mac_str}"],
+                    "device_type": dev_type,
+                    "status":      "online"
+                }
+            except Exception:
+                pass
+    except Exception as e:
+        logger.error(f"ARP scan fallback failed: {e}")
+
+
+    discovered = list(discovered_dict.values())
     logger.info(f"Scan complete: {len(discovered)} hosts found of {len(hosts)} scanned")
     return {
         "discovered": discovered,

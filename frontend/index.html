@@ -592,8 +592,8 @@
             <span class="tab-label">Network Discovery</span>
         </button>
         <button class="tab-btn" role="tab" data-tab="software" id="btn-software" onclick="switchTab('software')">
-            <span class="tab-icon">💿</span>
-            <span class="tab-label">Software Inventory</span>
+            <span class="tab-icon">🖥️</span>
+            <span class="tab-label">Device Audits</span>
         </button>
         <button class="tab-btn" role="tab" data-tab="wifi" id="btn-wifi" onclick="switchTab('wifi')">
             <span class="tab-icon">📡</span>
@@ -961,16 +961,16 @@
     </div>
 
     <!-- ─────────────────────────────────────────────────────────────
-         TAB 4: SOFTWARE INVENTORY
+         TAB 4: DEVICE AUDITS (Hardware & Software)
     ───────────────────────────────────────────────────────────────── -->
     <div class="tab-panel" id="panel-software" role="tabpanel">
 
         <div class="card" style="margin-bottom:24px;">
             <div class="card-header">
-                <div class="card-icon purple">💿</div>
+                <div class="card-icon purple">🖥️</div>
                 <div>
-                    <div class="card-title">Software Inventory</div>
-                    <div class="card-subtitle">Browse installed applications from any audited device</div>
+                    <div class="card-title">Device Audits</div>
+                    <div class="card-subtitle">Browse hardware specs and installed software from audited devices</div>
                 </div>
             </div>
 
@@ -987,13 +987,74 @@
             </div>
         </div>
 
-        <!-- Software Table -->
+        <!-- Software & Hardware Panel -->
         <div id="softwarePanel" style="display:none;">
+            <!-- System Specifications Card -->
+            <div class="card" style="margin-bottom:24px; border-top: 4px solid var(--primary);">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 20px;">
+                    <div>
+                        <div class="card-title" id="swDeviceTitle" style="font-size: 20px;">Device Details</div>
+                        <div class="card-subtitle" id="swDeviceMeta">—</div>
+                    </div>
+                    <span class="badge badge-green" id="swLicenseStatus">Licensed</span>
+                </div>
+                
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; background: #f8fafc; padding: 20px; border-radius: 8px;">
+                    <div>
+                        <div style="color:var(--muted); font-size: 12px; font-weight:600; text-transform:uppercase; margin-bottom:4px;">Operating System</div>
+                        <div id="specOs" style="font-size:14px; font-weight:500; color:var(--text-1);">—</div>
+                        <div id="specOsVer" style="font-size:13px; color:var(--text-2); margin-top:2px;">—</div>
+                    </div>
+                    <div>
+                        <div style="color:var(--muted); font-size: 12px; font-weight:600; text-transform:uppercase; margin-bottom:4px;">Processor (CPU)</div>
+                        <div id="specCpu" style="font-size:14px; font-weight:500; color:var(--text-1);">—</div>
+                    </div>
+                    <div>
+                        <div style="color:var(--muted); font-size: 12px; font-weight:600; text-transform:uppercase; margin-bottom:4px;">Memory (RAM)</div>
+                        <div id="specRam" style="font-size:14px; font-weight:500; color:var(--text-1);">—</div>
+                    </div>
+                    <div>
+                        <div style="color:var(--muted); font-size: 12px; font-weight:600; text-transform:uppercase; margin-bottom:4px;">Storage Drives</div>
+                        <div id="specDisk" style="font-size:14px; font-weight:500; color:var(--text-1);">—</div>
+                    </div>
+                    <div>
+                        <div style="color:var(--muted); font-size: 12px; font-weight:600; text-transform:uppercase; margin-bottom:4px;">Manufacturer / Model</div>
+                        <div id="specModel" style="font-size:14px; font-weight:500; color:var(--text-1);">—</div>
+                        <div id="specSerial" style="font-size:13px; color:var(--text-2); margin-top:2px;">—</div>
+                    </div>
+                    <div>
+                        <div style="color:var(--muted); font-size: 12px; font-weight:600; text-transform:uppercase; margin-bottom:4px;">Security & Antivirus</div>
+                        <div id="specAv" style="font-size:14px; font-weight:500; color:var(--text-1);">—</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Login History Card -->
+            <div class="card" style="margin-bottom:24px; border-top: 4px solid var(--info);">
+                <div class="card-title" style="margin-bottom:16px;">Recent Logins</div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>User</th>
+                                <th>Domain</th>
+                                <th>Logon Type</th>
+                                <th>Timestamp</th>
+                            </tr>
+                        </thead>
+                        <tbody id="loginHistoryBody">
+                            <tr><td colspan="5" style="text-align:center; color:var(--muted);">No login history available</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Software Inventory Card -->
             <div class="card">
                 <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
                     <div>
-                        <div class="card-title" id="swDeviceTitle">Software on —</div>
-                        <div class="card-subtitle" id="swDeviceMeta">—</div>
+                        <div class="card-title">Software Inventory</div>
                     </div>
                     <div style="display:flex; gap:10px;">
                         <span class="badge badge-blue" id="swTotalBadge">0 apps</span>
@@ -1669,9 +1730,39 @@ async function loadSoftwareForDevice() {
         const data = await r.json();
         swData     = data.software_inventory || [];
 
-        document.getElementById('swDeviceTitle').textContent = `Software on ${name}`;
-        document.getElementById('swDeviceMeta').textContent  = `Last audit: ${data.last_audit || 'Unknown'}`;
+        document.getElementById('swDeviceTitle').textContent = `${name}`;
+        document.getElementById('swDeviceMeta').textContent  = `Last audited: ${data.last_audit || 'Unknown'} | Architecture: ${data.architecture || 'Unknown'}`;
+        document.getElementById('swLicenseStatus').textContent = data.license_status || 'Unknown License';
         document.getElementById('swTotalBadge').textContent  = `${data.total} apps`;
+        
+        // Populate Specs
+        const hw = data.hardware_details || {};
+        document.getElementById('specOs').textContent = data.os_name || '—';
+        document.getElementById('specOsVer').textContent = data.os_version ? `Build ${data.os_version}` : '—';
+        document.getElementById('specCpu').textContent = hw.cpu || '—';
+        document.getElementById('specRam').textContent = hw.ram || '—';
+        document.getElementById('specDisk').textContent = hw.disk || '—';
+        document.getElementById('specModel').textContent = (hw.manufacturer && hw.model) ? `${hw.manufacturer} ${hw.model}` : '—';
+        document.getElementById('specSerial').textContent = hw.serial_number ? `S/N: ${hw.serial_number}` : '—';
+        document.getElementById('specAv').textContent = data.antivirus || '—';
+
+        // Populate Login History
+        const logins = data.login_history || [];
+        const loginTbody = document.getElementById('loginHistoryBody');
+        if (logins.length === 0) {
+            loginTbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--muted);">No login history available</td></tr>`;
+        } else {
+            loginTbody.innerHTML = logins.map((l, i) => `
+                <tr>
+                    <td style="color:var(--muted-lt); font-size:12px;">${i+1}</td>
+                    <td><b>${esc(l.username || '—')}</b></td>
+                    <td>${esc(l.domain || '—')}</td>
+                    <td><span class="badge badge-${l.logon_type === 'Local' ? 'purple' : 'orange'}">${esc(l.logon_type || '—')}</span></td>
+                    <td style="color:var(--text-2);">${esc(l.time || '—')}</td>
+                </tr>
+            `).join('');
+        }
+
         document.getElementById('swEmpty').style.display     = 'none';
         document.getElementById('softwarePanel').style.display = 'block';
         renderSoftwareTable(swData);

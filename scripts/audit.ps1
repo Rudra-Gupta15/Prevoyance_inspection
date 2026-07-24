@@ -311,7 +311,64 @@ try {
 } catch {}
 
 # ────────────────────────────────────────────────────────────────────────────
-#  19. Construct JSON Data Payload
+#  19. Collect Login History
+# ────────────────────────────────────────────────────────────────────────────
+Write-Host "Collecting recent login history..." -ForegroundColor Cyan
+$loginHistory = @()
+
+$isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+
+if ($isAdmin) {
+    # Full history from Security event log (requires Admin)
+    # LogonType: 2=Interactive, 7=Unlock, 10=RemoteInteractive(RDP), 11=CachedInteractive
+    try {
+        $events = Get-WinEvent -FilterHashtable @{LogName='Security'; Id=4624} -MaxEvents 200 -ErrorAction Stop
+        foreach ($event in $events) {
+            $xml = [xml]$event.ToXml()
+            $logonType = ($xml.Event.EventData.Data | Where-Object { $_.Name -eq 'LogonType' }).'#text'
+            if ($logonType -in '2', '7', '10', '11') {
+                $targetUser = ($xml.Event.EventData.Data | Where-Object { $_.Name -eq 'TargetUserName' }).'#text'
+                $targetDomain = ($xml.Event.EventData.Data | Where-Object { $_.Name -eq 'TargetDomainName' }).'#text'
+                if ($targetUser -and $targetUser -notmatch 'SYSTEM|UMFD|DWM|ANONYMOUS|Font Driver' -and $targetUser -notmatch '\$') {
+                    $typeLabel = switch ($logonType) {
+                        '2'  { 'Local Interactive' }
+                        '7'  { 'Unlock' }
+                        '10' { 'Remote (RDP)' }
+                        '11' { 'Cached Interactive' }
+                        default { "Type $logonType" }
+                    }
+                    $loginHistory += @{
+                        username   = Get-SafeString $targetUser "Unknown"
+                        domain     = Get-SafeString $targetDomain "Unknown"
+                        logon_type = $typeLabel
+                        time       = $event.TimeCreated.ToString("yyyy-MM-dd HH:mm:ss")
+                    }
+                }
+            }
+        }
+        # Keep most recent 20 entries
+        if ($loginHistory.Count -gt 20) { $loginHistory = $loginHistory[0..19] }
+    } catch {}
+}
+
+# Fallback (always runs): Get-LocalUser LastLogon — works without Admin
+if ($loginHistory.Count -eq 0) {
+    try {
+        $localUsers = Get-LocalUser -ErrorAction SilentlyContinue | Where-Object { $_.LastLogon -ne $null }
+        foreach ($u in $localUsers) {
+            $loginHistory += @{
+                username   = Get-SafeString $u.Name "Unknown"
+                domain     = $env:COMPUTERNAME
+                logon_type = "Local (Last Known)"
+                time       = $u.LastLogon.ToString("yyyy-MM-dd HH:mm:ss")
+            }
+        }
+    } catch {}
+}
+
+
+# ────────────────────────────────────────────────────────────────────────────
+#  20. Construct JSON Data Payload
 # ────────────────────────────────────────────────────────────────────────────
 $data = @{
     execution_datetime    = $executionDateTime
@@ -342,6 +399,7 @@ $data = @{
     network_details       = $networkDetails
     user_accounts         = $userAccounts
     software_inventory    = $softwareInventory
+    login_history         = $loginHistory
 }
 
 $json = $data | ConvertTo-Json -Depth 8
@@ -355,12 +413,30 @@ $apiUrl = "http://127.0.0.1:8000/upload-audit?client_id=$client_id"
 $jsonBytes = [System.Text.Encoding]::UTF8.GetBytes($json)
 
 Write-Host "Uploading secure payload to backend..." -ForegroundColor Yellow
+$uploaded = $false
+
+# Attempt 1: Invoke-RestMethod with explicit 5-minute timeout
 try {
-    $res = Invoke-RestMethod -Uri $apiUrl -Method POST -Body $jsonBytes -ContentType "application/json; charset=utf-8"
+    $res = Invoke-RestMethod -Uri $apiUrl -Method POST -Body $jsonBytes -ContentType "application/json; charset=utf-8" -TimeoutSec 300
     Write-Host "Audit upload completed successfully!" -ForegroundColor Green
+    $uploaded = $true
 } catch {
-    Write-Host "Upload failed: $_" -ForegroundColor Red
-    if ($_.ErrorDetails.Message) {
-        Write-Host $_.ErrorDetails.Message -ForegroundColor Red
+    Write-Host "Attempt 1 failed, retrying with WebClient..." -ForegroundColor Yellow
+}
+
+# Attempt 2: Use .NET WebClient (no timeout limit)
+if (-not $uploaded) {
+    try {
+        $wc = New-Object System.Net.WebClient
+        $wc.Headers.Add("Content-Type", "application/json; charset=utf-8")
+        $responseBytes = $wc.UploadData($apiUrl, "POST", $jsonBytes)
+        $responseStr = [System.Text.Encoding]::UTF8.GetString($responseBytes)
+        Write-Host "Audit upload completed successfully!" -ForegroundColor Green
+        $uploaded = $true
+    } catch {
+        Write-Host "Upload failed: $_" -ForegroundColor Red
+        if ($_.ErrorDetails.Message) {
+            Write-Host $_.ErrorDetails.Message -ForegroundColor Red
+        }
     }
 }
