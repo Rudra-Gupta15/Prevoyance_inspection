@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NSDL Enterprise Compliance Audit Portal</title>
+    <title>Info Enterprise Compliance Audit Portal</title>
 
     <!-- Premium Google Fonts: Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -13,15 +13,14 @@
 
     <style>
         :root {
-            --bg-color: #0b0f19;
-            --card-bg: rgba(17, 24, 39, 0.7);
-            --card-border: rgba(255, 255, 255, 0.08);
-            --primary-accent: #00f2fe;
-            --secondary-accent: #4facfe;
-            --success-color: #10b981;
-            --text-main: #f3f4f6;
-            --text-muted: #9ca3af;
-            --crimson-red: #A80000;
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --primary-accent: #1e3a8a; /* NSDL Deep Blue */
+            --secondary-accent: #ea580c; /* NSDL Orange/Amber */
+            --success-color: #059669;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border-color: #e2e8f0;
         }
 
         * {
@@ -32,414 +31,425 @@
 
         body {
             background-color: var(--bg-color);
-            background-image: 
-                radial-gradient(at 10% 20%, rgba(0, 242, 254, 0.05) 0px, transparent 50%),
-                radial-gradient(at 90% 80%, rgba(79, 172, 254, 0.05) 0px, transparent 50%);
-            font-family: 'Inter', sans-serif;
+            font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             color: var(--text-main);
+            display: flex;
+            flex-direction: column;
             min-height: 100vh;
+        }
+
+        .app-header {
+            background: #ffffff;
+            border-bottom: 1px solid var(--border-color);
+            padding: 0 40px;
+            height: 70px;
             display: flex;
             align-items: center;
-            justify-content: center;
-            padding: 20px;
-            overflow-x: hidden;
-        }
-
-        .container {
-            width: 100%;
-            max-width: 600px;
-        }
-
-        .card {
-            background: var(--card-bg);
-            border: 1px solid var(--card-border);
-            border-radius: 24px;
-            padding: 40px;
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4),
-                inset 0 1px 0 rgba(255, 255, 255, 0.05);
-            text-align: center;
-            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .card::before {
-            content: '';
-            position: absolute;
+            justify-content: space-between;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+            position: sticky;
             top: 0;
-            left: 0;
-            right: 0;
-            height: 4px;
-            background: linear-gradient(90deg, var(--crimson-red), var(--secondary-accent));
+            z-index: 10;
         }
 
-        h1 {
-            font-size: 28px;
-            font-weight: 800;
-            letter-spacing: -0.5px;
-            margin-bottom: 8px;
-            background: linear-gradient(135deg, #ffffff 40%, var(--text-muted) 100%);
-            -webkit-background-clip: text;
-            background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .subtitle {
-            font-size: 14px;
-            color: var(--text-muted);
-            line-height: 1.6;
-            margin-bottom: 30px;
-        }
-
-        /* TIN FC Form Controls */
-        .form-box {
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            border-radius: 16px;
-            padding: 24px;
-            margin-bottom: 24px;
-            text-align: left;
-        }
-
-        .form-box-title {
-            font-size: 13px;
+        .brand {
+            font-size: 16px;
             font-weight: 700;
-            color: var(--secondary-accent);
-            text-transform: uppercase;
+            color: var(--primary-accent);
+            display: flex;
+            align-items: center;
+            gap: 12px;
             letter-spacing: 0.5px;
-            margin-bottom: 16px;
+            text-transform: uppercase;
         }
 
-        .input-group {
-            margin-bottom: 14px;
+        .brand-icon {
+            background: var(--primary-accent);
+            color: white;
+            padding: 6px;
+            border-radius: 6px;
+            font-size: 16px;
+            line-height: 1;
         }
 
-        .input-group:last-child {
-            margin-bottom: 0;
+        .main-content {
+            flex: 1;
+            width: 100%;
+            max-width: 980px;
+            margin: 0 auto;
+            padding: 48px 24px;
         }
 
-        .input-group label {
+        .page-header {
+            margin-bottom: 40px;
+        }
+
+        .page-title {
+            font-size: 32px;
+            font-weight: 800;
+            color: var(--text-main);
+            margin-bottom: 8px;
+            letter-spacing: -0.5px;
+        }
+
+        .page-subtitle {
+            font-size: 15px;
+            color: var(--text-muted);
+            max-width: 600px;
+            line-height: 1.5;
+        }
+
+        .dashboard-layout {
+            display: grid;
+            grid-template-columns: 1fr 320px;
+            gap: 28px;
+            align-items: start;
+        }
+
+        @media (max-width: 900px) {
+            .dashboard-layout {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .panel {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 36px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02), 0 2px 4px -1px rgba(0,0,0,0.02);
+        }
+
+        .panel-sidebar {
+            background: #f8fafc;
+            padding: 32px;
+        }
+
+        /* Forms */
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+
+        .form-group.full {
+            grid-column: span 2;
+        }
+
+        label {
             display: block;
-            font-size: 11px;
+            font-size: 12px;
             font-weight: 600;
             color: var(--text-muted);
-            margin-bottom: 6px;
+            margin-bottom: 8px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
 
         .input-field {
+            font-family: inherit;
             width: 100%;
-            background: rgba(0, 0, 0, 0.3);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 12px 16px;
+            background: #f8fafc;
+            border: 1px solid var(--border-color);
             border-radius: 8px;
-            padding: 10px 14px;
-            color: #ffffff;
-            font-size: 13px;
-            transition: all 0.3s ease;
+            font-size: 14px;
+            color: var(--text-main);
+            transition: all 0.2s;
         }
 
         .input-field:focus {
             outline: none;
-            border-color: var(--secondary-accent);
-            box-shadow: 0 0 8px rgba(79, 172, 254, 0.2);
+            background: #ffffff;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
         }
 
-        /* Status & Button Groups */
+        .btn {
+            font-family: inherit;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            background: var(--primary-accent);
+            color: white;
+            padding: 14px 28px;
+            font-size: 15px;
+            font-weight: 600;
+            border-radius: 8px;
+            text-decoration: none;
+            transition: all 0.2s;
+            border: none;
+            cursor: pointer;
+            width: 100%;
+            white-space: nowrap;
+        }
+
+        .btn-icon-only {
+            width: auto;
+            padding: 14px 18px;
+        }
+
+        .btn:hover {
+            background: #1e40af;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(30,58,138,0.15);
+        }
+
+        .btn-secondary {
+            background: white;
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background: #f1f5f9;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            transform: translateY(-1px);
+        }
+
+        /* Status Badge */
         .status-badge {
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            background: rgba(245, 158, 11, 0.1);
-            border: 1px solid rgba(245, 158, 11, 0.25);
             padding: 6px 14px;
+            background: #fff7ed;
+            border: 1px solid #fed7aa;
             border-radius: 20px;
-            font-size: 12px;
+            font-size: 13px;
             font-weight: 600;
-            color: #fbbf24;
-            margin-bottom: 20px;
-            transition: all 0.3s ease;
+            color: #c2410c;
         }
 
         .status-dot {
             width: 8px;
             height: 8px;
-            background-color: #fbbf24;
+            background: var(--secondary-accent);
             border-radius: 50%;
-            animation: pulse-dot 1.5s infinite;
         }
 
-        .success-badge {
-            background: rgba(16, 185, 129, 0.15);
-            border-color: rgba(16, 185, 129, 0.3);
-            color: #34d399;
-        }
-
-        .success-badge .status-dot {
-            background-color: #34d399;
-        }
-
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 100%;
-            background: linear-gradient(135deg, var(--crimson-red) 0%, #7f0000 100%);
-            border: none;
-            border-radius: 12px;
-            padding: 14px 28px;
-            color: #ffffff;
-            font-size: 14px;
-            font-weight: 700;
-            text-decoration: none;
-            cursor: pointer;
-            box-shadow: 0 4px 15px rgba(168, 0, 0, 0.3);
-            transition: all 0.3s ease;
-        }
-
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(168, 0, 0, 0.5);
-        }
-
-        .btn-xml {
-            background: linear-gradient(135deg, #374151 0%, #1f2937 100%);
-            box-shadow: 0 4px 15px rgba(55, 65, 81, 0.3);
-            margin-top: 10px;
-        }
-
-        .btn-xml:hover {
-            box-shadow: 0 6px 20px rgba(55, 65, 81, 0.5);
-        }
-
-        /* Instructions visual container */
-        .instructions-box {
-            background: rgba(255, 255, 255, 0.01);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            border-radius: 16px;
-            padding: 24px;
-            text-align: left;
-            margin-top: 24px;
-        }
-
-        .instructions-box h3 {
-            font-size: 13px;
-            font-weight: 700;
-            margin-bottom: 12px;
-            color: var(--text-main);
-        }
-
-        .step-item {
-            display: flex;
-            gap: 12px;
-            margin-bottom: 12px;
-            font-size: 12px;
-            color: var(--text-muted);
-            line-height: 1.5;
-        }
-
-        .step-item:last-child {
-            margin-bottom: 0;
-        }
-
-        .step-number {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 20px;
-            height: 20px;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 50%;
-            font-weight: 700;
-            color: var(--primary-accent);
-            flex-shrink: 0;
-            font-size: 10px;
-        }
-
-        /* Neon Loader Spinner */
+        /* Animations & Icons */
         .loader-spinner {
-            width: 60px;
-            height: 60px;
-            border: 4px solid rgba(0, 242, 254, 0.08);
+            width: 54px;
+            height: 54px;
+            border: 4px solid #e2e8f0;
             border-top: 4px solid var(--primary-accent);
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
-            position: relative;
-            box-shadow: 0 0 15px rgba(0, 242, 254, 0.15);
+            margin: 0 auto 24px auto;
         }
 
-        /* Animated Success Checkmark */
         .success-ring {
-            width: 70px;
-            height: 70px;
+            width: 72px;
+            height: 72px;
             border-radius: 50%;
-            background: rgba(16, 185, 129, 0.1);
-            border: 2px solid var(--success-color);
+            background: #ecfdf5;
+            border: 3px solid var(--success-color);
             display: flex;
             align-items: center;
             justify-content: center;
             margin: 0 auto 24px auto;
-            box-shadow: 0 0 20px rgba(16, 185, 129, 0.2);
         }
 
         .success-icon {
-            font-size: 32px;
+            font-size: 36px;
             color: var(--success-color);
             font-weight: bold;
         }
 
-        /* Animations */
         @keyframes spin {
-            100% {
-                transform: rotate(360deg);
-            }
+            100% { transform: rotate(360deg); }
         }
 
-        @keyframes pulse-dot {
-            0%, 100% { opacity: 0.4; }
-            50% { opacity: 1; }
-        }
-
-        /* Fade transitions */
         .fade-in {
-            animation: fadeIn 0.8s forwards ease-out;
+            animation: fadeIn 0.4s forwards ease-out;
         }
 
         @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(15px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Terminal Code Block Styles */
+        .code-block {
+            background: #111827; /* Dark slate */
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 16px;
+            text-align: left;
+            position: relative;
+            border: 1px solid #374151;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        .code-block pre {
+            margin: 0;
+            color: #10b981; /* Terminal green */
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            font-size: 13px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            line-height: 1.6;
+        }
+        .copy-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #374151;
+            border: none;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .copy-btn:hover {
+            background: #4b5563;
+        }
+        .copy-btn.copied {
+            background: var(--success-color);
         }
     </style>
 </head>
 
 <body>
+    <!-- HEADER -->
+    <header class="app-header">
+        <div class="brand">
+            <span class="brand-icon">🛡️</span>
+            Info Portal
+        </div>
+        <div class="header-status">
+            <div class="status-badge" id="statusBadge">
+                <span class="status-dot" id="statusDot"></span>
+                <span id="statusText">Waiting for Scan</span>
+            </div>
+        </div>
+    </header>
 
-    <div class="container fade-in">
-        <div class="card" id="mainCard">
-            <!-- Active State -->
-            <div id="activeState">
-                <div class="status-badge" id="statusBadge">
-                    <span class="status-dot" id="statusDot"></span>
-                    <span id="statusText">Waiting for System Scan...</span>
-                </div>
+    <!-- MAIN CONTENT -->
+    <main class="main-content">
+        <div class="page-header fade-in">
+            <h1 class="page-title">System Compliance Audit</h1>
+            <p class="page-subtitle">Verify your branch systems to generate the official Info-compliant audit report.</p>
+        </div>
 
-                <!-- 1. Initial Configuration View -->
-                <div id="setupView">
-                    <h1>NSDL Compliance Audit Portal</h1>
-                    <p class="subtitle">Securely verify your branch systems to generate the official NSDL-compliant compliance audit & inventory report.</p>
-
-                    <!-- TIN FC Branch configuration fields -->
-                    <div class="form-box">
-                        <div class="form-box-title">📋 TIN FC Branch Configuration</div>
-                        <div class="input-group">
-                            <label for="branchName">TIN FC Branch Name</label>
+        <div class="dashboard-layout">
+            
+            <!-- LEFT COLUMN: Dynamic Views -->
+            <div class="panel" id="mainPanel" style="position: relative; overflow: hidden; min-height: 440px;">
+                
+                <!-- 1. SETUP VIEW -->
+                <div id="setupView" class="fade-in">
+                    <h2 style="font-size: 16px; font-weight: 700; margin-bottom: 28px; color: var(--primary-accent); display: flex; align-items: center; gap: 8px; text-transform: uppercase; letter-spacing: 0.5px;">
+                        📋 Branch Configuration
+                    </h2>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="branchName">User Branch Name</label>
                             <input type="text" id="branchName" class="input-field" placeholder="e.g. RELIGARE BROKING LIMITED" value="RELIGARE BROKING LIMITED">
                         </div>
-                        <div class="input-group">
-                            <label for="branchCode">TIN FC Branch Code</label>
+                        <div class="form-group">
+                            <label for="branchCode">User Branch Code</label>
                             <input type="text" id="branchCode" class="input-field" placeholder="e.g. 8301231" value="8301231">
                         </div>
-                        <div class="input-group">
-                            <label for="officerName">Branch Officer Name</label>
+                        <div class="form-group full">
+                            <label for="officerName">User Officer Name</label>
                             <input type="text" id="officerName" class="input-field" placeholder="e.g. SANDIP BALIRAM LOKHANDE" value="SANDIP BALIRAM LOKHANDE">
                         </div>
+                        <div class="form-group full">
+                            <label for="osSelection">Operating System</label>
+                            <select id="osSelection" class="input-field" onchange="updateDownloadUrl()">
+                                <option value="windows" selected>Windows</option>
+                                <option value="mac">macOS</option>
+                                <option value="linux">Linux</option>
+                            </select>
+                        </div>
                     </div>
-
-                    <div style="margin: 24px 0;">
+                    
+                    <div style="margin-top: 40px; padding-top: 32px; border-top: 1px solid var(--border-color);">
                         <a href="#" class="btn" id="downloadBtn" onclick="triggerScanDownload()">
                             📥 Start Compliance Audit
                         </a>
                     </div>
+                </div>
 
-                    <div class="instructions-box">
-                        <h3>💡 Quick Verification Steps</h3>
-                        <div class="step-item">
-                            <span class="step-number">1</span>
-                            <span>Verify or adjust the <b>TIN FC Branch Configuration</b> details above.</span>
-                        </div>
-                        <div class="step-item">
-                            <span class="step-number">2</span>
-                            <span>Click the <b>"Start Compliance Audit"</b> button to download your secure <b>verify_system.vbs</b> launcher.</span>
-                        </div>
-                        <div class="step-item">
-                            <span class="step-number">3</span>
-                            <span>Double-click the downloaded file in your browser. It runs <b>completely silently in the background</b> (no console window flashes), and this page updates automatically!</span>
+                <!-- 2. PROCESSING VIEW -->
+                <div id="processingView" class="fade-in" style="display: none; text-align: center; padding: 50px 20px;">
+                    <div class="loader-spinner"></div>
+                    <h2 style="font-size: 24px; font-weight: 800; margin-bottom: 12px; color: var(--primary-accent);">Audit In Progress...</h2>
+                    <p style="color: var(--text-muted); line-height: 1.6; font-size: 15px; max-width: 400px; margin: 0 auto;">
+                        Secure diagnostic scan is executing on your workstation.<br><br>
+                        <span id="instructionText"></span>
+                    </p>
+                    <div id="cmdBlockContainer" style="display: none; max-width: 500px; margin: 20px auto 0 auto;">
+                        <div class="code-block">
+                            <button class="copy-btn" id="copyBtn" onclick="copyCommand()">📋 Copy</button>
+                            <pre id="cmdText"></pre>
                         </div>
                     </div>
                 </div>
 
-                <!-- 2. Real-time Processing / Loading View -->
-                <div id="processingView" style="display: none;">
-                    <h1 style="background: linear-gradient(135deg, #ffffff 30%, #38bdf8 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; font-size: 26px;">
-                        Audit In Progress...
-                    </h1>
-                    <p class="subtitle" style="margin-top: 8px; margin-bottom: 30px; font-size: 13px;">
-                        Secure diagnostic scan is executing on your workstation.
+                <!-- 3. SUCCESS VIEW -->
+                <div id="successState" class="fade-in" style="display: none; text-align: center; padding: 30px 20px;">
+                    <div class="success-ring">
+                        <span class="success-icon">✓</span>
+                    </div>
+                    <h2 style="font-size: 26px; font-weight: 800; color: var(--text-main); margin-bottom: 12px;">Audit Successful!</h2>
+                    <p style="color: var(--text-muted); font-size: 15px; margin-bottom: 40px;">
+                        Your enterprise system audit & compliance report has been securely compiled and synchronized.
                     </p>
-
-                    <!-- Clean Central Neon Spinner Loader -->
-                    <div style="display: flex; justify-content: center; margin: 36px 0;">
-                        <div class="loader-spinner"></div>
+                    
+                    <div class="form-grid">
+                        <div class="form-group full" style="display: flex; gap: 12px;">
+                            <a href="#" id="downloadPdfBtn" class="btn" target="_blank" style="flex: 1;">
+                                📥 Download Info PDF Report
+                            </a>
+                            <a href="#" id="viewPdfBtn" class="btn btn-secondary btn-icon-only" target="_blank" title="View PDF in browser">
+                                👁️ View
+                            </a>
+                        </div>
+                        <div class="form-group full" style="display: flex; gap: 12px;">
+                            <a href="#" id="downloadXmlBtn" class="btn btn-secondary" target="_blank" style="flex: 1;">
+                                📄 Export XML Compliance Data
+                            </a>
+                            <a href="#" id="viewXmlBtn" class="btn btn-secondary btn-icon-only" target="_blank" title="View XML in browser">
+                                👁️ View
+                            </a>
+                        </div>
                     </div>
+                </div>
 
-                    <!-- Single Simple Instruction Card -->
-                    <div class="instructions-box" style="border-color: rgba(56, 189, 248, 0.25); background: rgba(56, 189, 248, 0.02); text-align: center; padding: 18px 24px; border-radius: 12px;">
-                        <p style="font-size: 14px; color: var(--text-main); font-weight: 500; line-height: 1.6; margin: 0;">
-                            👇 Please click on the downloaded <b>verify_system.vbs</b> file in your browser's download bar (Top-Right) to start the background scan.
-                        </p>
-                        <p style="font-size: 12px; color: var(--text-muted); line-height: 1.5; margin-top: 8px; margin-bottom: 0;">
-                            It will run completely silently in the background. Once the secure upload completes, this page will update automatically!
-                        </p>
-                    </div>
+            </div>
+
+            <!-- RIGHT COLUMN: Instructions Sidebar -->
+            <div class="sidebar">
+                <div class="panel panel-sidebar fade-in">
+                    <h3 style="font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 24px; color: var(--text-main);">💡 Quick Instructions</h3>
+                    
+                    <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 20px;">
+                        <li style="display: flex; gap: 14px; align-items: flex-start; font-size: 14px; color: var(--text-muted); line-height: 1.6;">
+                            <div style="background: white; border: 1px solid #bfdbfe; color: #2563eb; font-weight: bold; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">1</div>
+                            <div>Verify or adjust the branch configuration details on the left.</div>
+                        </li>
+                        <li style="display: flex; gap: 14px; align-items: flex-start; font-size: 14px; color: var(--text-muted); line-height: 1.6;">
+                            <div style="background: white; border: 1px solid #bfdbfe; color: #2563eb; font-weight: bold; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">2</div>
+                            <div>Click <b>Start Compliance Audit</b> to download your secure launcher.</div>
+                        </li>
+                        <li style="display: flex; gap: 14px; align-items: flex-start; font-size: 14px; color: var(--text-muted); line-height: 1.6;">
+                            <div style="background: white; border: 1px solid #bfdbfe; color: #2563eb; font-weight: bold; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">3</div>
+                            <div>Run the downloaded file. It executes silently and this page will update automatically!</div>
+                        </li>
+                    </ul>
                 </div>
             </div>
 
-            <!-- Success State -->
-            <div id="successState" style="display: none;">
-                <div class="status-badge success-badge">
-                    <span class="status-dot"></span>
-                    Audit Complete
-                </div>
-
-                <div class="success-ring">
-                    <span class="success-icon">✓</span>
-                </div>
-
-                <h1 style="background: linear-gradient(135deg, #ffffff 30%, #34d399 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;">
-                    Audit Successful!
-                </h1>
-                
-                <p class="subtitle" style="margin-top: 10px; margin-bottom: 24px;">
-                    Your enterprise system audit & compliance report has been securely compiled.
-                </p>
-
-                <!-- Dual PDF / XML Download Buttons -->
-                <div style="margin: 20px 0; display: flex; flex-direction: column; gap: 10px;">
-                    <a href="#" id="downloadPdfBtn" class="btn" target="_blank">
-                        📥 Download NSDL PDF Report
-                    </a>
-                    <a href="#" id="downloadXmlBtn" class="btn btn-xml" target="_blank">
-                        📄 Export XML Compliance Data
-                    </a>
-                </div>
-
-                <div class="instructions-box" style="margin-top: 15px; border-color: rgba(16, 185, 129, 0.2); background: rgba(16, 185, 129, 0.02);">
-                    <h3 style="color: #34d399;">✓ Reports Saved in Backend</h3>
-                    <p style="font-size: 13px; color: var(--text-muted); line-height: 1.6;">
-                        A beautifully formatted, NSDL-compliant inspection PDF and structured XML compliance inventory data have been securely stored. You can safely exit this portal.
-                    </p>
-                </div>
-            </div>
         </div>
-    </div>
+    </main>
 
     <script>
         // Extract or generate a unique Client Session ID
@@ -459,8 +469,68 @@
             const bName = document.getElementById('branchName').value;
             const bCode = document.getElementById('branchCode').value;
             const oName = document.getElementById('officerName').value;
+            const osSelect = document.getElementById('osSelection').value;
+            
+            let downloadEndpoint = "/download-vbs";
+            if (osSelect === "mac") {
+                downloadEndpoint = "/download-mac";
+            } else if (osSelect === "linux") {
+                downloadEndpoint = "/download-linux";
+            }
 
-            downloadBtn.href = `/download-vbs?client_id=${clientId}&branch_name=${encodeURIComponent(bName)}&branch_code=${encodeURIComponent(bCode)}&officer_name=${encodeURIComponent(oName)}`;
+            downloadBtn.href = `${downloadEndpoint}?client_id=${clientId}&branch_name=${encodeURIComponent(bName)}&branch_code=${encodeURIComponent(bCode)}&officer_name=${encodeURIComponent(oName)}`;
+            
+            const instructionText = document.getElementById('instructionText');
+            const cmdBlockContainer = document.getElementById('cmdBlockContainer');
+            const cmdText = document.getElementById('cmdText');
+
+            if (osSelect === "windows") {
+                instructionText.innerHTML = `Please click the downloaded <b>verify_system_${clientId}.vbs</b> file in your browser to authorize the background process.`;
+                cmdBlockContainer.style.display = "none";
+            } else if (osSelect === "mac") {
+                instructionText.innerHTML = `Open your terminal and paste this command to run the audit:`;
+                cmdBlockContainer.style.display = "block";
+                cmdText.innerText = `cd ~/Downloads\nchmod +x verify_system_${clientId}.command\n./verify_system_${clientId}.command`;
+            } else if (osSelect === "linux") {
+                instructionText.innerHTML = `Open your terminal and paste this command to run the audit:`;
+                cmdBlockContainer.style.display = "block";
+                cmdText.innerText = `cd ~/Downloads\nchmod +x verify_system_${clientId}.sh\n./verify_system_${clientId}.sh`;
+            }
+        }
+
+        function copyCommand() {
+            const cmdText = document.getElementById('cmdText').innerText;
+            
+            const showCopied = () => {
+                const copyBtn = document.getElementById('copyBtn');
+                copyBtn.innerHTML = "✓ Copied!";
+                copyBtn.classList.add("copied");
+                setTimeout(() => {
+                    copyBtn.innerHTML = "📋 Copy";
+                    copyBtn.classList.remove("copied");
+                }, 2000);
+            };
+
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(cmdText).then(showCopied);
+            } else {
+                // Fallback for non-HTTPS connections (like testing on local IP)
+                const textArea = document.createElement("textarea");
+                textArea.value = cmdText;
+                textArea.style.position = "fixed";
+                textArea.style.left = "-999999px";
+                textArea.style.top = "-999999px";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    showCopied();
+                } catch (err) {
+                    console.error('Fallback copy failed', err);
+                }
+                document.body.removeChild(textArea);
+            }
         }
 
         // Run URL builder on interaction
@@ -484,28 +554,17 @@
             const statusText = document.getElementById('statusText');
 
             // Set badge theme to blue processing state
-            statusBadge.style.background = 'rgba(56, 189, 248, 0.15)';
-            statusBadge.style.borderColor = 'rgba(56, 189, 248, 0.3)';
-            statusBadge.style.color = '#38bdf8';
-            statusDot.style.backgroundColor = '#38bdf8';
+            statusBadge.style.background = '#eff6ff';
+            statusBadge.style.borderColor = '#bfdbfe';
+            statusBadge.style.color = '#2563eb';
+            statusDot.style.backgroundColor = '#3b82f6';
             statusText.innerText = 'Audit In Progress...';
 
-            // Fade out setup view
-            setupView.style.opacity = '0';
-            setupView.style.transition = 'opacity 0.3s ease';
+            setupView.style.display = 'none';
+            processingView.style.display = 'block';
 
-            setTimeout(() => {
-                setupView.style.display = 'none';
-                processingView.style.display = 'block';
-                processingView.style.opacity = '0';
-                processingView.style.transition = 'opacity 0.4s ease';
-
-                processingView.offsetHeight; // force reflow
-                processingView.style.opacity = '1';
-
-                // Start status polling
-                startPolling();
-            }, 300);
+            // Start status polling
+            startPolling();
         }
 
         function startPolling() {
@@ -538,43 +597,41 @@
                 "'": '&#39;'
             }[char]));
 
-            statusBadge.style.background = 'rgba(239, 68, 68, 0.15)';
-            statusBadge.style.borderColor = 'rgba(239, 68, 68, 0.3)';
-            statusBadge.style.color = '#f87171';
-            statusDot.style.backgroundColor = '#f87171';
+            statusBadge.style.background = '#fef2f2';
+            statusBadge.style.borderColor = '#fecaca';
+            statusBadge.style.color = '#dc2626';
+            statusDot.style.backgroundColor = '#ef4444';
             statusText.innerText = 'Audit Failed';
 
             processingView.innerHTML = `
-                <h1 style="background: linear-gradient(135deg, #ffffff 30%, #f87171 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; font-size: 26px;">
-                    Audit Failed
-                </h1>
-                <p class="subtitle" style="margin-top: 8px; margin-bottom: 24px; font-size: 13px;">
+                <h2 style="font-size: 24px; font-weight: 800; color: #ef4444; margin-bottom: 12px;">Audit Failed</h2>
+                <p style="color: var(--text-muted); line-height: 1.6; font-size: 15px; max-width: 400px; margin: 0 auto;">
                     ${safeMessage}
                 </p>
             `;
         }
 
         function showSuccessState() {
-            const mainCard = document.getElementById('mainCard');
-            const activeState = document.getElementById('activeState');
+            const processingView = document.getElementById('processingView');
             const successState = document.getElementById('successState');
+            const statusBadge = document.getElementById('statusBadge');
+            const statusDot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+
+            statusBadge.style.background = '#ecfdf5';
+            statusBadge.style.borderColor = '#a7f3d0';
+            statusBadge.style.color = '#059669';
+            statusDot.style.backgroundColor = '#10b981';
+            statusText.innerText = 'Audit Complete';
 
             // Configure dynamic report links
-            document.getElementById('downloadPdfBtn').href = `/download-report?client_id=${clientId}&format=pdf`;
-            document.getElementById('downloadXmlBtn').href = `/download-report?client_id=${clientId}&format=xml`;
+            document.getElementById('downloadPdfBtn').href = `/download-report?client_id=${clientId}&format=pdf&action=download`;
+            document.getElementById('viewPdfBtn').href = `/download-report?client_id=${clientId}&format=pdf&action=view`;
+            document.getElementById('downloadXmlBtn').href = `/download-report?client_id=${clientId}&format=xml&action=download`;
+            document.getElementById('viewXmlBtn').href = `/download-report?client_id=${clientId}&format=xml&action=view`;
 
-            activeState.style.opacity = '0';
-            activeState.style.transition = 'opacity 0.4s ease';
-
-            setTimeout(() => {
-                activeState.style.display = 'none';
-                successState.style.display = 'block';
-                successState.style.opacity = '0';
-                successState.style.transition = 'opacity 0.6s ease';
-
-                successState.offsetHeight; // force reflow
-                successState.style.opacity = '1';
-            }, 400);
+            processingView.style.display = 'none';
+            successState.style.display = 'block';
         }
     </script>
 </body>

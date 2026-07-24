@@ -138,7 +138,10 @@ if ($antivirus.Count -eq 0) {
 # 9. Connected Printer Details
 $printers = @()
 try {
-    $printerObjects = Get-CimInstance Win32_Printer -ErrorAction Stop
+    $printerObjects = Get-CimInstance Win32_Printer -ErrorAction Stop | Where-Object {
+        $_.Name -notmatch "Microsoft Print to PDF|Microsoft XPS Document Writer|OneNote|Fax|Root Print|Send to Microsoft|AnyDesk" -and
+        $_.PortName -notmatch "PORTPROMPT:|SHRFAX:|nul:"
+    }
     foreach ($p in $printerObjects) {
         $printers += @{
             name = Get-SafeString $p.Name "Unknown"
@@ -150,7 +153,64 @@ try {
     }
 } catch {}
 
-# 10. Construct JSON Data payload
+# 10. Hardware Details (CPU, RAM, Disk)
+$hardwareDetails = @{
+    cpu = "Unknown"
+    ram = "Unknown"
+    disk = "Unknown"
+}
+try {
+    $cpu = Get-CimInstance Win32_Processor -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($cpu) { $hardwareDetails.cpu = $cpu.Name }
+
+    $ram = Get-CimInstance Win32_PhysicalMemory -ErrorAction SilentlyContinue
+    if ($ram) {
+        $totalRam = ($ram | Measure-Object -Property Capacity -Sum).Sum
+        $hardwareDetails.ram = [math]::Round($totalRam / 1GB, 2).ToString() + " GB"
+    }
+
+    $disks = Get-CimInstance Win32_LogicalDisk -Filter "DriveType=3" -ErrorAction SilentlyContinue
+    if ($disks) {
+        $diskStrings = @()
+        foreach ($d in $disks) {
+            if ($d.Size -gt 0) {
+                $free = [math]::Round($d.FreeSpace / 1GB, 2)
+                $size = [math]::Round($d.Size / 1GB, 2)
+                $diskStrings += "$($d.DeviceID) $free GB free of $size GB"
+            }
+        }
+        if ($diskStrings.Count -gt 0) {
+            $hardwareDetails.disk = $diskStrings -join ", "
+        }
+    }
+} catch {}
+
+# 11. Network Details
+$networkDetails = @()
+try {
+    $nics = Get-CimInstance Win32_NetworkAdapterConfiguration -Filter "IPEnabled=True" -ErrorAction SilentlyContinue
+    foreach ($nic in $nics) {
+        $networkDetails += @{
+            ip_address = if ($nic.IPAddress) { $nic.IPAddress -join ", " } else { "Unknown" }
+            gateway = if ($nic.DefaultIPGateway) { $nic.DefaultIPGateway -join ", " } else { "Unknown" }
+            mac = if ($nic.MACAddress) { $nic.MACAddress } else { "Unknown" }
+        }
+    }
+} catch {}
+
+# 12. Local User Accounts
+$userAccounts = @()
+try {
+    $users = Get-CimInstance Win32_UserAccount -Filter "LocalAccount=True" -ErrorAction SilentlyContinue
+    foreach ($u in $users) {
+        $userAccounts += @{
+            name = if ($u.Name) { $u.Name } else { "Unknown" }
+            disabled = if ($u.Disabled) { "True" } else { "False" }
+        }
+    }
+} catch {}
+
+# 13. Construct JSON Data payload
 $data = @{
     execution_datetime    = $executionDateTime
     consent               = $consentText
@@ -165,6 +225,9 @@ $data = @{
     compression_utilities = $compressionUtilities
     antivirus             = $antivirus
     printers              = $printers
+    hardware_details      = $hardwareDetails
+    network_details       = $networkDetails
+    user_accounts         = $userAccounts
 }
 
 $json = $data | ConvertTo-Json -Depth 6

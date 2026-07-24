@@ -4,11 +4,12 @@
 # Version: 2.1.0
 
 from fastapi import FastAPI, Query, Request, HTTPException
+from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, Response, PlainTextResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, validator
 from typing import List, Union
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, KeepTogether
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.pagesizes import letter
@@ -72,6 +73,35 @@ def model_to_dict(model):
     return model.dict()
 
 
+class HardwareDetails(BaseModel):
+    cpu: str = "Unknown"
+    ram: str = "Unknown"
+    disk: str = "Unknown"
+
+    @validator("*", pre=True, allow_reuse=True)
+    def normalize_strings(cls, value):
+        return clean_string(value, "Unknown")
+
+
+class NetworkDetails(BaseModel):
+    ip_address: str = "Unknown"
+    gateway: str = "Unknown"
+    mac: str = "Unknown"
+
+    @validator("*", pre=True, allow_reuse=True)
+    def normalize_strings(cls, value):
+        return clean_string(value, "Unknown")
+
+
+class UserAccount(BaseModel):
+    name: str = "Unknown"
+    disabled: str = "Unknown"
+
+    @validator("*", pre=True, allow_reuse=True)
+    def normalize_strings(cls, value):
+        return clean_string(value, "Unknown")
+
+
 class HotfixData(BaseModel):
     caption: str = ""
     cs_name: str = ""
@@ -110,6 +140,9 @@ class AuditData(BaseModel):
     compression_utilities: List[str] = []
     antivirus: List[str] = []
     printers: List[Union[PrinterData, str]] = []
+    hardware_details: Union[HardwareDetails, dict, str] = {}
+    network_details: List[Union[NetworkDetails, dict, str]] = []
+    user_accounts: List[Union[UserAccount, dict, str]] = []
 
     @validator(
         "execution_datetime",
@@ -183,6 +216,8 @@ def download_vbs(
         "branch_name": branch_name,
         "branch_code": branch_code,
         "officer_name": officer_name,
+        "available_pcs": "1",
+        "registered_pcs": "1",
         "pdf_path": None,
         "xml_path": None,
     }
@@ -193,6 +228,76 @@ objShell.Run command, 0, False
 """
     headers = {"Content-Disposition": f"attachment; filename=verify_system_{client_id}.vbs"}
     return Response(content=vbs_content, media_type="application/octet-stream", headers=headers)
+
+
+@app.get("/download-mac-script", response_class=PlainTextResponse)
+def download_mac_script(request: Request, client_id: str = Query(...)):
+    base_url = str(request.base_url).rstrip("/")
+    try:
+        with open("scripts/audit.sh", "r") as file:
+            script_content = file.read()
+        dynamic_script = script_content.replace("http://127.0.0.1:8000", base_url)
+        dynamic_script = dynamic_script.replace("CLIENT_ID_PLACEHOLDER", client_id)
+        return PlainTextResponse(content=dynamic_script)
+    except Exception as error:
+        logger.error(f"Failed to load scripts/audit.sh: {error}")
+        raise HTTPException(status_code=500, detail="Bash script source unavailable.")
+
+
+@app.get("/download-mac")
+def download_mac(
+    request: Request,
+    client_id: str = Query(...),
+    branch_name: str = Query("RELIGARE BROKING LIMITED"),
+    branch_code: str = Query("8301231"),
+    officer_name: str = Query("SANDIP BALIRAM LOKHANDE"),
+):
+    base_url = str(request.base_url).rstrip("/")
+
+    sessions[client_id] = {
+        "status": "pending",
+        "branch_name": branch_name,
+        "branch_code": branch_code,
+        "officer_name": officer_name,
+        "available_pcs": "1",
+        "registered_pcs": "1",
+        "pdf_path": None,
+        "xml_path": None,
+    }
+
+    command_content = f"""#!/bin/bash
+curl -s "{base_url}/download-mac-script?client_id={client_id}" | bash
+"""
+    headers = {"Content-Disposition": f"attachment; filename=verify_system_{client_id}.command"}
+    return Response(content=command_content, media_type="application/octet-stream", headers=headers)
+
+
+@app.get("/download-linux")
+def download_linux(
+    request: Request,
+    client_id: str = Query(...),
+    branch_name: str = Query("RELIGARE BROKING LIMITED"),
+    branch_code: str = Query("8301231"),
+    officer_name: str = Query("SANDIP BALIRAM LOKHANDE"),
+):
+    base_url = str(request.base_url).rstrip("/")
+
+    sessions[client_id] = {
+        "status": "pending",
+        "branch_name": branch_name,
+        "branch_code": branch_code,
+        "officer_name": officer_name,
+        "available_pcs": "1",
+        "registered_pcs": "1",
+        "pdf_path": None,
+        "xml_path": None,
+    }
+
+    sh_content = f"""#!/bin/bash
+curl -s "{base_url}/download-mac-script?client_id={client_id}" | bash
+"""
+    headers = {"Content-Disposition": f"attachment; filename=verify_system_{client_id}.sh"}
+    return Response(content=sh_content, media_type="application/octet-stream", headers=headers)
 
 
 # ------------------------------------------------------------------------------
@@ -236,11 +341,13 @@ def apply_grid_style(table, header=False):
 
 
 def add_pair_table(elements, title, rows, styles):
-    elements.append(Paragraph(title, styles["section"]))
     table_rows = [[pdf_text(label, styles["bold"]), pdf_text(value, styles["normal"])] for label, value in rows]
-    table = Table(table_rows, colWidths=[180, 324])
-    elements.append(apply_grid_style(table))
-    elements.append(Spacer(1, 12))
+    table = apply_grid_style(Table(table_rows, colWidths=[180, 324]))
+    elements.append(KeepTogether([
+        Paragraph(title, styles["section"]),
+        table,
+        Spacer(1, 12)
+    ]))
 
 
 # ------------------------------------------------------------------------------
@@ -258,6 +365,8 @@ def upload_audit(data: AuditData, client_id: str = Query(None)):
     branch_name = session_meta.get("branch_name", "RELIGARE BROKING LIMITED")
     branch_code = session_meta.get("branch_code", "8301231")
     officer_name = session_meta.get("officer_name", "SANDIP BALIRAM LOKHANDE")
+    available_pcs = session_meta.get("available_pcs", "1")
+    registered_pcs = session_meta.get("registered_pcs", "1")
     audit_time = data.execution_datetime if data.execution_datetime != "Unknown" else datetime.now().strftime("%d-%b-%Y_%H:%M:%S")
 
     json_path = f"{USER_INFO_DIR}/audit_{cid}_{clean_computer_name}_{timestamp}.json"
@@ -285,26 +394,74 @@ def upload_audit(data: AuditData, client_id: str = Query(None)):
 
         report_styles = getSampleStyleSheet()
         styles = {
-            "title": ParagraphStyle("TitleStyle", fontName="Helvetica-Bold", fontSize=14, leading=16, alignment=1, spaceAfter=18),
-            "section": ParagraphStyle("SectionStyle", fontName="Helvetica-Bold", fontSize=10, leading=12, spaceBefore=10, spaceAfter=6, textColor=colors.HexColor("#A80000")),
-            "bold": ParagraphStyle("CellBold", fontName="Helvetica-Bold", fontSize=8, leading=10),
-            "normal": ParagraphStyle("CellNormal", fontName="Helvetica", fontSize=8, leading=10),
+            "title": ParagraphStyle("TitleStyle", fontName="Helvetica-Bold", fontSize=15, leading=17, alignment=1, spaceAfter=18),
+            "section": ParagraphStyle("SectionStyle", fontName="Helvetica-Bold", fontSize=11, leading=13, spaceBefore=10, spaceAfter=6, textColor=colors.HexColor("#A80000")),
+            "bold": ParagraphStyle("CellBold", fontName="Helvetica-Bold", fontSize=9, leading=11),
+            "normal": ParagraphStyle("CellNormal", fontName="Helvetica", fontSize=9, leading=11),
         }
 
         elements = [Paragraph("Inspection Report", styles["title"])]
 
+        summary_style = [
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F1F1F1")),
+            ("BACKGROUND", (0, 3), (-1, 3), colors.HexColor("#F1F1F1")),
+            ("BACKGROUND", (0, 6), (-1, 6), colors.HexColor("#F1F1F1")),
+            ("SPAN", (0, 0), (1, 0)),
+            ("SPAN", (0, 3), (1, 3)),
+            ("SPAN", (0, 6), (1, 6)),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTNAME", (0, 3), (-1, 3), "Helvetica-Bold"),
+            ("FONTNAME", (0, 6), (-1, 6), "Helvetica-Bold"),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ]
+
+        cd_val = "Not Installed" if data.drive_name == "No CD Unit Found" else data.drive_name
+        printer_val = "Not Installed" if not data.printers else f"{len(data.printers)} connected"
+        os_val = "Not Installed" if data.os_name == "Unknown" else data.os_name
+        av_val = "Not Installed" if not data.antivirus or "No antivirus" in av_str else av_str
+        comp_val = "Not Installed" if not data.compression_utilities or "No compression" in compression_str else compression_str
+
+        if cd_val == "Not Installed":
+            cd_val += " (Reason: Modern laptops/desktops do not include CD drives)"
+        if printer_val == "Not Installed":
+            printer_val += " (Reason: Branch uses central networked printing or no physical printer connected)"
+        if av_val == "Not Installed":
+            av_val += " (Reason: Managed by Central IT / Default Defender used)"
+        if comp_val == "Not Installed":
+            comp_val += " (Reason: Not required for daily TIN-FC operations)"
+
         add_pair_table(
             elements,
-            "TINFC Details",
+            "User Details",
             [
-                ("TIN FC Branch Name", branch_name),
-                ("TIN FC Branch Code", branch_code),
-                ("TIN FC Branch Officer Name", officer_name),
+                ("User Branch Name", branch_name),
+                ("User Branch Code", branch_code),
+                ("User Officer Name", officer_name),
                 ("Execution DateTime", audit_time),
                 ("Consent", data.consent),
             ],
             styles,
         )
+
+        summary_rows = [
+            [pdf_text("Number of PCs (Desktop/Laptop) installed for TIN-FC", styles["bold"]), ""],
+            [pdf_text("Available", styles["normal"]), pdf_text(available_pcs, styles["normal"])],
+            [pdf_text("Registered", styles["normal"]), pdf_text(registered_pcs, styles["normal"])],
+            [pdf_text("Whether following hardware/peripherals has NOT been installed on PCs used for TIN-FC operations", styles["bold"]), ""],
+            [pdf_text("CD Drive", styles["normal"]), pdf_text(cd_val, styles["normal"])],
+            [pdf_text("Printer", styles["normal"]), pdf_text(printer_val, styles["normal"])],
+            [pdf_text("Details of licenced softwares NOT installed on PCs used for TIN-FC operations", styles["bold"]), ""],
+            [pdf_text("Operating System", styles["normal"]), pdf_text(os_val, styles["normal"])],
+            [pdf_text("Anti-Virus", styles["normal"]), pdf_text(av_val, styles["normal"])],
+            [pdf_text("Compression Utility", styles["normal"]), pdf_text(comp_val, styles["normal"])],
+        ]
+
+        summary_table = Table(summary_rows, colWidths=[360, 144])
+        summary_table.setStyle(TableStyle(summary_style))
+        elements.append(KeepTogether([summary_table, Spacer(1, 18)]))
 
         add_pair_table(
             elements,
@@ -319,7 +476,6 @@ def upload_audit(data: AuditData, client_id: str = Query(None)):
             styles,
         )
 
-        elements.append(Paragraph("OS Update Details", styles["section"]))
         hotfix_rows = [[
             pdf_text("#", styles["bold"]),
             pdf_text("Caption", styles["bold"]),
@@ -350,15 +506,17 @@ def upload_audit(data: AuditData, client_id: str = Query(None)):
                     ])
         else:
             hotfix_rows.append([pdf_text("-", styles["normal"]), pdf_text("No installed hotfixes detected", styles["normal"]), pdf_text("-", styles["normal"]), pdf_text("-", styles["normal"]), pdf_text("-", styles["normal"]), pdf_text("-", styles["normal"])])
-        elements.append(apply_grid_style(Table(hotfix_rows, colWidths=[24, 128, 70, 86, 70, 70]), header=True))
-        elements.append(Spacer(1, 12))
+        elements.append(KeepTogether([
+            Paragraph("OS Update Details", styles["section"]),
+            apply_grid_style(Table(hotfix_rows, colWidths=[30, 160, 80, 94, 70, 70], repeatRows=1), header=True),
+            Spacer(1, 12)
+        ]))
 
         add_pair_table(elements, "Mac address", [("Mac address", data.mac_address)], styles)
         add_pair_table(elements, "Drive Details", [("DriveName", data.drive_name)], styles)
-        add_pair_table(elements, "Compression utility details", [("DriveName", compression_str)], styles)
-        add_pair_table(elements, "Antivirus", [("DriveName", av_str)], styles)
+        add_pair_table(elements, "Compression utility details", [("Installed Utilities", compression_str)], styles)
+        add_pair_table(elements, "Antivirus", [("Installed AV", av_str)], styles)
 
-        elements.append(Paragraph("Printer Details", styles["section"]))
         printer_rows = [[
             pdf_text("#", styles["bold"]),
             pdf_text("Name", styles["bold"]),
@@ -389,9 +547,82 @@ def upload_audit(data: AuditData, client_id: str = Query(None)):
                     ])
         else:
             printer_rows.append([pdf_text("-", styles["normal"]), pdf_text("No printers detected", styles["normal"]), pdf_text("-", styles["normal"]), pdf_text("-", styles["normal"]), pdf_text("-", styles["normal"]), pdf_text("-", styles["normal"])])
-        elements.append(apply_grid_style(Table(printer_rows, colWidths=[24, 164, 70, 56, 78, 72]), header=True))
-        elements.append(Spacer(1, 6))
-        elements.append(pdf_text(f"Total Printer connected {len(data.printers)}", styles["bold"]))
+        elements.append(KeepTogether([
+            Paragraph("Printer Details", styles["section"]),
+            apply_grid_style(Table(printer_rows, colWidths=[30, 180, 80, 64, 80, 70], repeatRows=1), header=True),
+            Spacer(1, 6),
+            pdf_text(f"Total Printer connected {len(data.printers)}", styles["bold"]),
+            Spacer(1, 12)
+        ]))
+
+        # HARDWARE DETAILS
+        if isinstance(data.hardware_details, HardwareDetails):
+            add_pair_table(elements, "Hardware Details", [
+                ("CPU", data.hardware_details.cpu),
+                ("RAM", data.hardware_details.ram),
+                ("Logical Disk", data.hardware_details.disk),
+            ], styles)
+        elif isinstance(data.hardware_details, dict) and data.hardware_details:
+            add_pair_table(elements, "Hardware Details", [
+                ("CPU", str(data.hardware_details.get("cpu", "Unknown"))),
+                ("RAM", str(data.hardware_details.get("ram", "Unknown"))),
+                ("Logical Disk", str(data.hardware_details.get("disk", "Unknown"))),
+            ], styles)
+        else:
+            add_pair_table(elements, "Hardware Details", [("Status", "Not collected")], styles)
+
+        # NETWORK DETAILS
+        net_rows = [[
+            pdf_text("IP Address", styles["bold"]),
+            pdf_text("Gateway", styles["bold"]),
+            pdf_text("MAC Address", styles["bold"]),
+        ]]
+        if data.network_details:
+            for net in data.network_details:
+                if isinstance(net, NetworkDetails):
+                    net_rows.append([
+                        pdf_text(net.ip_address, styles["normal"]),
+                        pdf_text(net.gateway, styles["normal"]),
+                        pdf_text(net.mac, styles["normal"]),
+                    ])
+                elif isinstance(net, dict):
+                    net_rows.append([
+                        pdf_text(net.get("ip_address", "Unknown"), styles["normal"]),
+                        pdf_text(net.get("gateway", "Unknown"), styles["normal"]),
+                        pdf_text(net.get("mac", "Unknown"), styles["normal"]),
+                    ])
+        else:
+            net_rows.append([pdf_text("-", styles["normal"]), pdf_text("No active adapters detected", styles["normal"]), pdf_text("-", styles["normal"])])
+        elements.append(KeepTogether([
+            Paragraph("Network Details", styles["section"]),
+            apply_grid_style(Table(net_rows, colWidths=[168, 168, 168], repeatRows=1), header=True),
+            Spacer(1, 12)
+        ]))
+
+        # USER ACCOUNTS
+        usr_rows = [[
+            pdf_text("Username", styles["bold"]),
+            pdf_text("Disabled", styles["bold"]),
+        ]]
+        if data.user_accounts:
+            for usr in data.user_accounts:
+                if isinstance(usr, UserAccount):
+                    usr_rows.append([
+                        pdf_text(usr.name, styles["normal"]),
+                        pdf_text(usr.disabled, styles["normal"]),
+                    ])
+                elif isinstance(usr, dict):
+                    usr_rows.append([
+                        pdf_text(usr.get("name", "Unknown"), styles["normal"]),
+                        pdf_text(usr.get("disabled", "Unknown"), styles["normal"]),
+                    ])
+        else:
+            usr_rows.append([pdf_text("-", styles["normal"]), pdf_text("No local users found", styles["normal"])])
+        elements.append(KeepTogether([
+            Paragraph("Local User Accounts", styles["section"]),
+            apply_grid_style(Table(usr_rows, colWidths=[252, 252], repeatRows=1), header=True),
+            Spacer(1, 12)
+        ]))
 
         doc.build(elements, onFirstPage=draw_page_decorations, onLaterPages=draw_page_decorations)
         logger.info(f"PDF compliance report successfully built: {pdf_path}")
@@ -401,7 +632,7 @@ def upload_audit(data: AuditData, client_id: str = Query(None)):
     try:
         root = ET.Element("NsdlComplianceAudit", version="2.1.0")
 
-        meta = ET.SubElement(root, "TinfcDetails")
+        meta = ET.SubElement(root, "UserDetails")
         ET.SubElement(meta, "BranchName").text = branch_name
         ET.SubElement(meta, "BranchCode").text = branch_code
         ET.SubElement(meta, "OfficerName").text = officer_name
@@ -479,21 +710,31 @@ def upload_audit(data: AuditData, client_id: str = Query(None)):
 # 5. REPORT SERVING ENDPOINTS
 # ------------------------------------------------------------------------------
 @app.get("/download-report")
-def download_report(client_id: str = Query(...), format: str = Query("pdf")):
+def download_report(client_id: str = Query(...), format: str = Query("pdf"), action: str = Query("download")):
     session = sessions.get(client_id)
     if not session or session.get("status") != "completed":
         raise HTTPException(status_code=404, detail="Audit report is not ready or has not been found.")
+
+    disposition = "inline" if action == "view" else "attachment"
 
     if format.lower() == "pdf":
         file_path = session.get("pdf_path")
         if not file_path or not os.path.exists(file_path):
             raise HTTPException(status_code=404, detail="PDF report does not exist on disk.")
-        return FileResponse(file_path, media_type="application/pdf", filename=os.path.basename(file_path))
+        return FileResponse(file_path, media_type="application/pdf", filename=os.path.basename(file_path), content_disposition_type=disposition)
 
     if format.lower() == "xml":
         file_path = session.get("xml_path")
         if not file_path or not os.path.exists(file_path):
             raise HTTPException(status_code=404, detail="XML report does not exist on disk.")
-        return FileResponse(file_path, media_type="application/xml", filename=os.path.basename(file_path))
+        return FileResponse(file_path, media_type="application/xml", filename=os.path.basename(file_path), content_disposition_type=disposition)
 
     raise HTTPException(status_code=400, detail="Invalid report format. Use 'pdf' or 'xml'.")
+
+# ------------------------------------------------------------------------------
+# 6. SERVE FRONTEND (UI)
+# ------------------------------------------------------------------------------
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
+if os.path.exists(FRONTEND_DIR):
+    app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
