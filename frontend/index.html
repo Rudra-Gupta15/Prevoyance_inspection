@@ -568,7 +568,7 @@
         <div class="brand">
             <div class="brand-icon">🛡️</div>
             <div>
-                <div class="brand-name">NSDL Asset Management</div>
+                <div class="brand-name">Info Gathering</div>
                 <div class="brand-sub">IT Compliance &amp; Discovery Portal</div>
             </div>
         </div>
@@ -589,7 +589,7 @@
         </button>
         <button class="tab-btn" role="tab" data-tab="discovery" id="btn-discovery" onclick="switchTab('discovery')">
             <span class="tab-icon">🔍</span>
-            <span class="tab-label">Network Discovery</span>
+            <span class="tab-label">Info Gathering</span>
         </button>
         <button class="tab-btn" role="tab" data-tab="software" id="btn-software" onclick="switchTab('software')">
             <span class="tab-icon">🖥️</span>
@@ -981,7 +981,7 @@
                         <option value="">— Select a device —</option>
                     </select>
                 </div>
-                <div>
+                <div style="display:flex; gap:10px;">
                     <button class="btn btn-outline" onclick="refreshDeviceList()">🔄 Refresh Devices</button>
                 </div>
             </div>
@@ -996,7 +996,12 @@
                         <div class="card-title" id="swDeviceTitle" style="font-size: 20px;">Device Details</div>
                         <div class="card-subtitle" id="swDeviceMeta">—</div>
                     </div>
-                    <span class="badge badge-green" id="swLicenseStatus">Licensed</span>
+                    <div style="display:flex; gap:10px; align-items:center;">
+                        <button class="btn btn-primary btn-sm" onclick="downloadDeviceReport()" title="Download full audit report as PDF" style="gap:6px;">
+                            📄 Download PDF Report
+                        </button>
+                        <span class="badge badge-green" id="swLicenseStatus">Licensed</span>
+                    </div>
                 </div>
                 
                 <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; background: #f8fafc; padding: 20px; border-radius: 8px;">
@@ -1051,7 +1056,7 @@
             </div>
 
             <!-- Software Inventory Card -->
-            <div class="card">
+            <div class="card" style="margin-bottom:24px;">
                 <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
                     <div>
                         <div class="card-title">Software Inventory</div>
@@ -1086,6 +1091,81 @@
                     </table>
                 </div>
             </div>
+
+            <!-- Change Report Card (Progressive Diff) -->
+            <div class="card" id="changeReportCard" style="margin-bottom:24px; border-top: 4px solid #f59e0b;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                    <div>
+                        <div class="card-title" style="display:flex; align-items:center; gap:8px;">
+                            📊 Change Report
+                            <span id="changeReportScanCount" class="badge badge-blue" style="font-size:11px;"></span>
+                        </div>
+                        <div class="card-subtitle" id="changeReportMeta">Comparing last two scans…</div>
+                    </div>
+                </div>
+
+                <!-- No diff available -->
+                <div id="changeDiffNone" style="display:none; text-align:center; padding:20px; color:var(--muted); font-size:13px; background:#f8fafc; border-radius:8px;">
+                    🔍 Only <b>1 scan</b> found for this device. Run a second audit to see what changed.
+                </div>
+
+                <!-- Diff content -->
+                <div id="changeDiffContent" style="display:none;">
+
+                    <!-- Summary badges -->
+                    <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:20px;">
+                        <div id="diffBadgeInstalled" style="display:flex; align-items:center; gap:6px; background:#d1fae5; color:#065f46; padding:8px 14px; border-radius:8px; font-weight:600; font-size:13px;">
+                            ✅ <span id="diffInstalledCount">0</span> Newly Installed
+                        </div>
+                        <div id="diffBadgeRemoved" style="display:flex; align-items:center; gap:6px; background:#fee2e2; color:#991b1b; padding:8px 14px; border-radius:8px; font-weight:600; font-size:13px;">
+                            ❌ <span id="diffRemovedCount">0</span> Removed
+                        </div>
+                        <div id="diffBadgeHw" style="display:flex; align-items:center; gap:6px; background:#fef3c7; color:#92400e; padding:8px 14px; border-radius:8px; font-weight:600; font-size:13px;">
+                            ⚠️ <span id="diffHwCount">0</span> Hardware Changes
+                        </div>
+                    </div>
+
+                    <!-- No changes -->
+                    <div id="diffNoChanges" style="display:none; text-align:center; padding:20px; color:var(--muted); background:#f0fdf4; border-radius:8px; font-size:13px;">
+                        ✅ No changes detected between the last two scans. Device is stable.
+                    </div>
+
+                    <!-- Hardware changes -->
+                    <div id="diffHwSection" style="display:none; margin-bottom:20px;">
+                        <div style="font-weight:700; font-size:13px; color:#92400e; margin-bottom:8px; display:flex; align-items:center; gap:6px;">⚠️ Hardware / OS Changes</div>
+                        <div class="table-wrap">
+                            <table>
+                                <thead><tr><th>Component</th><th style="color:#991b1b;">Previous</th><th style="color:#065f46;">Current</th></tr></thead>
+                                <tbody id="diffHwBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Newly installed -->
+                    <div id="diffInstalledSection" style="display:none; margin-bottom:20px;">
+                        <div style="font-weight:700; font-size:13px; color:#065f46; margin-bottom:8px; display:flex; align-items:center; gap:6px;">✅ Newly Installed Software</div>
+                        <div class="table-wrap">
+                            <table>
+                                <thead><tr><th>#</th><th>Application</th><th>Version</th><th>Publisher</th></tr></thead>
+                                <tbody id="diffInstalledBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Removed software -->
+                    <div id="diffRemovedSection" style="display:none;">
+                        <div style="font-weight:700; font-size:13px; color:#991b1b; margin-bottom:8px; display:flex; align-items:center; gap:6px;">❌ Removed / Uninstalled Software</div>
+                        <div class="table-wrap">
+                            <table>
+                                <thead><tr><th>#</th><th>Application</th><th>Version</th><th>Publisher</th></tr></thead>
+                                <tbody id="diffRemovedBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
         </div>
 
         <div id="swEmpty" class="card">
@@ -1709,9 +1789,9 @@ async function refreshDeviceList() {
         sel.innerHTML = '<option value="">— Select a device —</option>';
         (data.devices || []).forEach(d => {
             const opt = document.createElement('option');
-            opt.value       = d.computer_name;
+            opt.value       = d.id || d.computer_name;
             opt.textContent = `${d.computer_name}  (${d.os_name || ''}) — ${d.last_seen || 'Unknown'}`;
-            if (d.computer_name === curr) opt.selected = true;
+            if (opt.value === curr) opt.selected = true;
             sel.appendChild(opt);
         });
     } catch(e) { console.error(e); }
@@ -1766,9 +1846,98 @@ async function loadSoftwareForDevice() {
         document.getElementById('swEmpty').style.display     = 'none';
         document.getElementById('softwarePanel').style.display = 'block';
         renderSoftwareTable(swData);
+        loadChangeReport(name);   // ← progressive diff
     } catch(e) {
         alert('Failed to load software inventory. Run a compliance audit first.');
         console.error(e);
+    }
+}
+
+async function loadChangeReport(deviceName) {
+    // Reset state
+    document.getElementById('changeDiffNone').style.display    = 'none';
+    document.getElementById('changeDiffContent').style.display = 'none';
+    document.getElementById('changeReportMeta').textContent    = 'Loading change report…';
+
+    try {
+        const r    = await fetch(`/api/device-diff/${encodeURIComponent(deviceName)}`);
+        const diff = await r.json();
+
+        document.getElementById('changeReportScanCount').textContent =
+            `${diff.scan_count || 1} scan${diff.scan_count !== 1 ? 's' : ''}`;
+
+        if (!diff.has_diff) {
+            document.getElementById('changeReportMeta').textContent = diff.message || 'Only 1 scan available.';
+            document.getElementById('changeDiffNone').style.display  = 'block';
+            return;
+        }
+
+        // Meta
+        document.getElementById('changeReportMeta').textContent =
+            `Previous: ${diff.previous_scan}  →  Current: ${diff.current_scan}`;
+
+        // Counts
+        document.getElementById('diffInstalledCount').textContent = diff.summary.installed_count;
+        document.getElementById('diffRemovedCount').textContent   = diff.summary.removed_count;
+        document.getElementById('diffHwCount').textContent        = diff.summary.hw_change_count;
+
+        const hasAnyChange = diff.summary.installed_count > 0 ||
+                             diff.summary.removed_count   > 0 ||
+                             diff.summary.hw_change_count > 0;
+
+        document.getElementById('diffNoChanges').style.display = hasAnyChange ? 'none' : 'block';
+
+        // Hardware changes
+        const hwSection = document.getElementById('diffHwSection');
+        if (diff.hw_changes && diff.hw_changes.length > 0) {
+            hwSection.style.display = 'block';
+            document.getElementById('diffHwBody').innerHTML = diff.hw_changes.map(c => `
+                <tr>
+                    <td><b>${esc(c.field)}</b></td>
+                    <td style="color:#991b1b; background:#fff5f5;">${esc(c.previous)}</td>
+                    <td style="color:#065f46; background:#f0fdf4;">${esc(c.current)}</td>
+                </tr>
+            `).join('');
+        } else {
+            hwSection.style.display = 'none';
+        }
+
+        // Newly installed
+        const instSection = document.getElementById('diffInstalledSection');
+        if (diff.newly_installed && diff.newly_installed.length > 0) {
+            instSection.style.display = 'block';
+            document.getElementById('diffInstalledBody').innerHTML = diff.newly_installed.map((sw, i) => `
+                <tr style="background:#f0fdf4;">
+                    <td style="color:var(--muted-lt); font-size:12px;">${i+1}</td>
+                    <td><b style="color:#065f46;">${esc(sw.name || '—')}</b></td>
+                    <td class="td-mono" style="color:var(--info);">${esc(sw.version || '—')}</td>
+                    <td style="color:var(--text-2);">${esc(sw.publisher || '—')}</td>
+                </tr>
+            `).join('');
+        } else {
+            instSection.style.display = 'none';
+        }
+
+        // Removed software
+        const remSection = document.getElementById('diffRemovedSection');
+        if (diff.newly_removed && diff.newly_removed.length > 0) {
+            remSection.style.display = 'block';
+            document.getElementById('diffRemovedBody').innerHTML = diff.newly_removed.map((sw, i) => `
+                <tr style="background:#fff5f5;">
+                    <td style="color:var(--muted-lt); font-size:12px;">${i+1}</td>
+                    <td><b style="color:#991b1b;">${esc(sw.name || '—')}</b></td>
+                    <td class="td-mono" style="color:var(--info);">${esc(sw.version || '—')}</td>
+                    <td style="color:var(--text-2);">${esc(sw.publisher || '—')}</td>
+                </tr>
+            `).join('');
+        } else {
+            remSection.style.display = 'none';
+        }
+
+        document.getElementById('changeDiffContent').style.display = 'block';
+    } catch(e) {
+        document.getElementById('changeReportMeta').textContent = 'Could not load change report.';
+        console.error('Change report error:', e);
     }
 }
 
@@ -1810,6 +1979,23 @@ function exportSoftwareCSV() {
     swData.forEach(sw => rows.push([sw.name, sw.version, sw.publisher, sw.install_date, sw.size_mb]));
     const device = document.getElementById('deviceSelector').value || 'device';
     downloadCSV(rows, `software_${device}.csv`);
+}
+
+function downloadDeviceReport() {
+    const name = document.getElementById('deviceSelector').value;
+    if (!name) { alert('Please select a device first.'); return; }
+    const btn = document.getElementById('downloadPdfBtn');
+    const orig = btn.innerHTML;
+    btn.innerHTML = '⏳ Generating…';
+    btn.disabled  = true;
+    // Use a hidden anchor to trigger file download
+    const a = document.createElement('a');
+    a.href     = `/api/download-device-pdf/${encodeURIComponent(name)}`;
+    a.download = `AuditReport_${name}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => { btn.innerHTML = orig; btn.disabled = false; }, 2000);
 }
 
 // ────────────────────────────────────────────────────────────────────
@@ -2049,7 +2235,7 @@ function renderWifiDevices(devices) {
             : `<span style="color:var(--muted);">${esc(d.os_name)}</span>`;
             
         const actionBtn = isAudited 
-            ? `<button class="btn btn-outline btn-sm" onclick="switchTab('software'); setTimeout(()=> {document.getElementById('deviceSelector').value='${esc(d.computer_name)}'; loadSoftwareForDevice();}, 300)">View Software</button>`
+            ? `<button class="btn btn-outline btn-sm" onclick="switchTab('software'); setTimeout(()=> {document.getElementById('deviceSelector').value='${esc(d.id || d.computer_name)}'; loadSoftwareForDevice();}, 300)">View Software</button>`
             : `<button class="btn btn-primary btn-sm" onclick="openRemoteAuditModal('${esc(d.ip)}')">Send Notification</button>`;
             
         return `

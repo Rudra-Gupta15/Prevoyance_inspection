@@ -216,7 +216,7 @@ import subprocess, json
 try:
     r = subprocess.run(
         ['system_profiler', 'SPApplicationsDataType', '-json'],
-        capture_output=True, text=True, timeout=300
+        capture_output=True, text=True, timeout=60
     )
     data = json.loads(r.stdout)
     apps_raw = data.get('SPApplicationsDataType', [])[:150]
@@ -315,7 +315,7 @@ JSON=$(cat <<EOF
 EOF
 )
 
-CLIENT_ID="CLIENT_ID_PLACEHOLDER"
+CLIENT_ID="123"
 API_URL="http://127.0.0.1:8000/upload-audit?client_id=$CLIENT_ID"
 
 echo "Uploading secure payload to backend..."

@@ -17,6 +17,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.pagesizes import letter
 from xml.sax.saxutils import escape
 import os
+import os as os_module
 import json
 import xml.etree.ElementTree as ET
 from datetime import datetime
@@ -1012,10 +1013,13 @@ def list_audited_devices():
                 try:
                     with open(f"{USER_INFO_DIR}/{fn}") as f:
                         d = json.load(f)
+                    mac = d.get("mac_address", "Unknown")
                     name = d.get("computer_name", "Unknown")
                     ts   = d.get("execution_datetime", "")
-                    if name not in devices or ts > devices[name]["last_seen"]:
-                        devices[name] = {
+                    uid  = mac if mac != "Unknown" else name
+                    if uid not in devices or ts > devices[uid]["last_seen"]:
+                        devices[uid] = {
+                            "id":            uid,
                             "computer_name": name,
                             "last_seen":     ts,
                             "os_name":       d.get("os_name", ""),
@@ -1026,8 +1030,8 @@ def list_audited_devices():
     return {"devices": list(devices.values()), "total": len(devices)}
 
 
-@app.get("/api/software/{computer_name}")
-def get_software_for_device(computer_name: str):
+@app.get("/api/software/{device_id}")
+def get_software_for_device(device_id: str):
     latest_file  = None
     latest_ts    = ""
     latest_data  = None
@@ -1037,7 +1041,10 @@ def get_software_for_device(computer_name: str):
                 try:
                     with open(f"{USER_INFO_DIR}/{fn}") as f:
                         d = json.load(f)
-                    if d.get("computer_name","").lower() == computer_name.lower():
+                    mac = d.get("mac_address", "Unknown")
+                    name = d.get("computer_name", "Unknown")
+                    uid = mac if mac != "Unknown" else name
+                    if uid.lower() == device_id.lower():
                         ts = d.get("execution_datetime", "")
                         if ts > latest_ts:
                             latest_ts   = ts
@@ -1046,9 +1053,10 @@ def get_software_for_device(computer_name: str):
                 except Exception:
                     pass
     if not latest_data:
-        raise HTTPException(status_code=404, detail=f"No audit found for device: {computer_name}")
+        raise HTTPException(status_code=404, detail=f"No audit found for device: {device_id}")
     return {
-        "computer_name":      computer_name,
+        "id":                 device_id,
+        "computer_name":      latest_data.get("computer_name", "Unknown"),
         "last_audit":         latest_ts,
         "software_inventory": latest_data.get("software_inventory", []),
         "total":              len(latest_data.get("software_inventory", [])),
@@ -1063,6 +1071,150 @@ def get_software_for_device(computer_name: str):
         "hotfixes":           latest_data.get("hotfixes", []),
         "antivirus":          latest_data.get("antivirus", "")
     }
+
+
+
+# ==============================================================================
+# 8c. PROGRESSIVE DIFF — COMPARE LAST TWO SCANS
+# ==============================================================================
+@app.get("/api/device-diff/{device_id}")
+def get_device_diff(device_id: str):
+    """
+    Compare the two most recent audit scans for a device.
+    Returns: newly installed apps, removed apps, hardware changes.
+    """
+    scans = []  # list of (execution_datetime, data_dict)
+
+    if os_module.path.exists(USER_INFO_DIR):
+        for fn in os_module.listdir(USER_INFO_DIR):
+            if not (fn.endswith(".json") and fn.startswith("audit_")):
+                continue
+            try:
+                with open(f"{USER_INFO_DIR}/{fn}") as f:
+                    d = json.load(f)
+                mac = d.get("mac_address", "Unknown")
+                name = d.get("computer_name", "Unknown")
+                uid = mac if mac != "Unknown" else name
+                if uid.lower() == device_id.lower():
+                    scans.append((d.get("execution_datetime", ""), d))
+            except Exception:
+                pass
+
+    if len(scans) < 2:
+        return {
+            "has_diff": False,
+            "message": "Need at least 2 scans to generate a change report.",
+            "scan_count": len(scans),
+        }
+
+    # Sort by datetime string ascending — latest last
+    scans.sort(key=lambda x: x[0])
+    prev_ts,  prev  = scans[-2]
+    curr_ts,  curr  = scans[-1]
+
+    # ── Software diff ─────────────────────────────────────────────────────────
+    def sw_key(entry):
+        """Unique key: lowercase name + version."""
+        if isinstance(entry, dict):
+            return f"{(entry.get('name') or '').strip().lower()}||{(entry.get('version') or '').strip()}"
+        return ""
+
+    prev_sw = {sw_key(s): s for s in prev.get("software_inventory", []) if sw_key(s)}
+    curr_sw = {sw_key(s): s for s in curr.get("software_inventory", []) if sw_key(s)}
+
+    installed_keys = set(curr_sw) - set(prev_sw)
+    removed_keys   = set(prev_sw) - set(curr_sw)
+
+    newly_installed = [curr_sw[k] for k in sorted(installed_keys)]
+    newly_removed   = [prev_sw[k] for k in sorted(removed_keys)]
+
+    # ── Hardware diff ─────────────────────────────────────────────────────────
+    hw_changes = []
+    hw_fields  = [
+        ("cpu",           "Processor (CPU)"),
+        ("ram",           "Memory (RAM)"),
+        ("disk",          "Storage"),
+        ("serial_number", "Serial Number"),
+        ("manufacturer",  "Manufacturer"),
+        ("model",         "Model"),
+    ]
+    prev_hw = prev.get("hardware_details", {}) if isinstance(prev.get("hardware_details"), dict) else {}
+    curr_hw = curr.get("hardware_details", {}) if isinstance(curr.get("hardware_details"), dict) else {}
+
+    for field, label in hw_fields:
+        pv = str(prev_hw.get(field, "Unknown") or "Unknown").strip()
+        cv = str(curr_hw.get(field, "Unknown") or "Unknown").strip()
+        if pv != cv:
+            hw_changes.append({"field": label, "previous": pv, "current": cv})
+
+    # OS changes
+    for field, label in [("os_name", "OS Name"), ("os_version", "OS Version"), ("architecture", "Architecture")]:
+        pv = str(prev.get(field, "Unknown") or "Unknown").strip()
+        cv = str(curr.get(field, "Unknown") or "Unknown").strip()
+        if pv != cv:
+            hw_changes.append({"field": label, "previous": pv, "current": cv})
+
+    return {
+        "has_diff":        True,
+        "scan_count":      len(scans),
+        "previous_scan":   prev_ts,
+        "current_scan":    curr_ts,
+        "newly_installed": newly_installed,
+        "newly_removed":   newly_removed,
+        "hw_changes":      hw_changes,
+        "summary": {
+            "installed_count": len(newly_installed),
+            "removed_count":   len(newly_removed),
+            "hw_change_count": len(hw_changes),
+        }
+    }
+
+
+
+# ==============================================================================
+@app.get("/api/download-device-pdf/{device_id}")
+def download_device_pdf(device_id: str):
+    """Find the latest PDF report for a given device_id and return it as a download."""
+    best_pdf = None
+    best_ts  = ""
+
+    if os_module.path.exists(USER_INFO_DIR):
+        for fn in os_module.listdir(USER_INFO_DIR):
+            if not (fn.endswith(".json") and fn.startswith("audit_")):
+                continue
+            try:
+                with open(f"{USER_INFO_DIR}/{fn}") as f:
+                    d = json.load(f)
+                mac = d.get("mac_address", "Unknown")
+                name = d.get("computer_name", "Unknown")
+                uid = mac if mac != "Unknown" else name
+                if uid.lower() != device_id.lower():
+                    continue
+                ts = d.get("execution_datetime", "")
+                if ts > best_ts:
+                    # Derive the expected PDF path from the JSON filename
+                    pdf_path = f"{USER_INFO_DIR}/{fn[:-5]}.pdf"  # swap .json -> .pdf
+                    if os_module.path.exists(pdf_path):
+                        best_ts  = ts
+                        best_pdf = pdf_path
+            except Exception:
+                pass
+
+    if not best_pdf:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No PDF report found for device: {computer_name}"
+        )
+
+    computer_name = None
+    safe_name = "".join(x for x in computer_name if x.isalnum() or x in "._- ").strip()
+    filename  = f"AuditReport_{safe_name}.pdf"
+    return FileResponse(
+        best_pdf,
+        media_type="application/pdf",
+        filename=filename,
+        content_disposition_type="attachment",
+    )
 
 
 # ==============================================================================
@@ -1464,6 +1616,7 @@ def wifi_scan_devices(subnet: str = Query(None)):
 
     # Build audit lookup: ip_address -> {computer_name, os_name, username, last_audit}
     audit_index: dict = {}
+    audit_mac_index: dict = {}
     if os.path.exists(USER_INFO_DIR):
         for fn in os.listdir(USER_INFO_DIR):
             if not (fn.endswith(".json") and fn.startswith("audit_")):
@@ -1473,25 +1626,51 @@ def wifi_scan_devices(subnet: str = Query(None)):
                     d = json.load(f)
                 users    = d.get("user_accounts", [])
                 username = users[0].get("name", "Unknown") if users else "Unknown"
+                
+                mac = d.get("mac_address", "Unknown")
+                name = d.get("computer_name", "Unknown")
+                uid = mac if mac != "Unknown" else name
+                
+                audit_info = {
+                    "id":            uid,
+                    "computer_name": name,
+                    "os_name":       d.get("os_name", "Unknown"),
+                    "username":      username,
+                    "last_audit":    d.get("execution_datetime", ""),
+                }
+                
+                if mac != "Unknown":
+                    clean_mac = mac.replace(":", "").replace("-", "").upper()
+                    audit_mac_index[clean_mac] = audit_info
+                    
                 for net in d.get("network_details", []):
                     raw_ip = net.get("ip_address", "")
                     for ip_part in raw_ip.split(","):
                         ip_clean = ip_part.strip()
                         if ip_clean and ip_clean not in ("Unknown", ""):
-                            audit_index[ip_clean] = {
-                                "computer_name": d.get("computer_name", "Unknown"),
-                                "os_name":       d.get("os_name", "Unknown"),
-                                "username":       username,
-                                "last_audit":    d.get("execution_datetime", ""),
-                            }
+                            audit_index[ip_clean] = audit_info
             except Exception:
                 pass
 
     # Enrich each discovered device
     for device in scan_result["discovered"]:
         ip = device["ip"]
-        if ip in audit_index:
-            a = audit_index[ip]
+        
+        # Extract MAC from scan result if present
+        scan_mac = None
+        for p in device.get("port_labels", []):
+            p_str = str(p)
+            if p_str.startswith("MAC: "):
+                scan_mac = p_str[5:].replace(":", "").replace("-", "").strip().upper()
+                break
+                
+        # Match by MAC address first, then IP
+        a = audit_mac_index.get(scan_mac) if scan_mac else None
+        if not a:
+            a = audit_index.get(ip)
+            
+        if a:
+            device["id"]            = a["id"]
             device["computer_name"] = a["computer_name"]
             device["os_name"]       = a["os_name"]
             device["username"]      = a["username"]
@@ -1594,19 +1773,34 @@ Invoke-WebRequest -Uri '{server_url}/api/get-audit-script?client_id={client_id}'
     raise HTTPException(status_code=500, detail={"message": "All attempted remote execution methods failed.", "errors": results})
 
 @app.get("/api/get-audit-script")
-def get_audit_script(request: Request, client_id: str):
-    script_path = os.path.join(BASE_DIR, "scripts", "audit.ps1")
-    if not os.path.exists(script_path):
-        raise HTTPException(status_code=404, detail="Script not found")
-    
+def get_audit_script(request: Request, client_id: str, os: str = None):
+    user_agent = request.headers.get("User-Agent", "").lower()
+
+    # Determine OS: explicit param wins, then fallback to User-Agent sniffing
+    if os:
+        is_unix = os.lower() in ("mac", "linux", "unix", "darwin")
+    else:
+        is_unix = any(k in user_agent for k in ("mac", "darwin", "linux", "curl", "wget"))
+
+    if is_unix:
+        script_file = "audit.sh"
+        media_type  = "text/x-sh"
+    else:
+        script_file = "audit.ps1"
+        media_type  = "text/plain"
+
+    script_path = os_module.path.join(BASE_DIR, "scripts", script_file)
+    if not os_module.path.exists(script_path):
+        raise HTTPException(status_code=404, detail=f"Script not found: {script_file}")
+
     with open(script_path, "r", encoding="utf-8") as f:
         script_content = f.read()
-        
+
     server_url = f"{request.url.scheme}://{request.url.netloc}"
     script_content = script_content.replace("CLIENT_ID_PLACEHOLDER", client_id)
     script_content = script_content.replace("http://127.0.0.1:8000/upload-audit", f"{server_url}/upload-audit")
-    
-    return PlainTextResponse(script_content)
+
+    return PlainTextResponse(script_content, media_type=media_type)
 
 # ==============================================================================
 # 10. SERVE FRONTEND (UI)
