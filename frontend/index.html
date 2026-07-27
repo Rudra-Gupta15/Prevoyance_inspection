@@ -1320,40 +1320,52 @@
             <div id="dev-tab-hardware" style="display:block;">
                 <div class="card" style="margin-bottom:24px;">
                     <div class="card-title" style="margin-bottom:16px; font-size:16px; display:flex; align-items:center; gap:8px;">🖥 System Information</div>
-                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; background: #f8fafc; padding: 20px; border-radius: 8px;">
-                        <div>
-                            <div style="color:var(--muted); font-size: 12px; font-weight:600; text-transform:uppercase; margin-bottom:4px;">Manufacturer / Model</div>
-                            <div id="specModel" style="font-size:14px; font-weight:500; color:var(--text-1);">—</div>
-                            <div id="specSerial" style="font-size:13px; color:var(--text-2); margin-top:2px;">—</div>
-                        </div>
-                        <div>
-                            <div style="color:var(--muted); font-size: 12px; font-weight:600; text-transform:uppercase; margin-bottom:4px;">Processor (CPU)</div>
-                            <div id="specCpu" style="font-size:14px; font-weight:500; color:var(--text-1);">—</div>
-                        </div>
-                        <div>
-                            <div style="color:var(--muted); font-size: 12px; font-weight:600; text-transform:uppercase; margin-bottom:4px;">Memory (RAM)</div>
-                            <div id="specRam" style="font-size:14px; font-weight:500; color:var(--text-1);">—</div>
-                        </div>
-                        <div>
-                            <div style="color:var(--muted); font-size: 12px; font-weight:600; text-transform:uppercase; margin-bottom:4px;">Storage Drives</div>
-                            <div id="specDisk" style="font-size:14px; font-weight:500; color:var(--text-1);">—</div>
-                        </div>
-                        <div>
-                            <div style="color:var(--muted); font-size: 12px; font-weight:600; text-transform:uppercase; margin-bottom:4px;">Graphics</div>
-                            <div style="font-size:14px; font-weight:500; color:var(--text-1);">—</div>
-                        </div>
-                        <div>
-                            <div style="color:var(--muted); font-size: 12px; font-weight:600; text-transform:uppercase; margin-bottom:4px;">BIOS / Firmware</div>
-                            <div style="font-size:14px; font-weight:500; color:var(--text-1);">—</div>
-                        </div>
-                        <div>
-                            <div style="color:var(--muted); font-size: 12px; font-weight:600; text-transform:uppercase; margin-bottom:4px;">Network Hardware</div>
-                            <div style="font-size:14px; font-weight:500; color:var(--text-1);">—</div>
-                        </div>
-                        <div>
-                            <div style="color:var(--muted); font-size: 12px; font-weight:600; text-transform:uppercase; margin-bottom:4px;">Peripherals</div>
-                            <div style="font-size:14px; font-weight:500; color:var(--text-1);">—</div>
-                        </div>
+                    <div style="display:grid; grid-template-columns: max-content max-content 1fr; gap: 12px 16px; background: #f8fafc; padding: 20px; border-radius: 8px; font-size:14px;">
+                        
+                        <span style="color:var(--muted); font-weight:600;">Hostname</span>
+                        <span>=</span>
+                        <span id="specHostname" style="color:var(--text-1);">—</span>
+                        
+                        <span style="color:var(--muted); font-weight:600;">Architecture</span>
+                        <span>=</span>
+                        <span id="specArch" style="color:var(--text-1);">—</span>
+                        
+                        <span style="color:var(--muted); font-weight:600;">Manufacturer / Model</span>
+                        <span>=</span>
+                        <span id="specModel" style="color:var(--text-1);">—</span>
+                        
+                        <span style="color:var(--muted); font-weight:600;">Serial Number</span>
+                        <span>=</span>
+                        <span id="specSerial" style="color:var(--text-1);">—</span>
+                        
+                        <span style="color:var(--muted); font-weight:600;">Processor (CPU)</span>
+                        <span>=</span>
+                        <span id="specCpu" style="color:var(--text-1);">—</span>
+                        
+                        <span style="color:var(--muted); font-weight:600;">Memory (RAM)</span>
+                        <span>=</span>
+                        <span id="specRam" style="color:var(--text-1);">—</span>
+                        
+                        <span style="color:var(--muted); font-weight:600;">Storage Drives</span>
+                        <span>=</span>
+                        <span id="specDisk" style="color:var(--text-1);">—</span>
+                        
+                        <span style="color:var(--muted); font-weight:600;">Graphics</span>
+                        <span>=</span>
+                        <span style="color:var(--text-1);">—</span>
+                        
+                        <span style="color:var(--muted); font-weight:600;">BIOS / Firmware</span>
+                        <span>=</span>
+                        <span style="color:var(--text-1);">—</span>
+                        
+                        <span style="color:var(--muted); font-weight:600;">Network Hardware</span>
+                        <span>=</span>
+                        <span style="color:var(--text-1);">—</span>
+                        
+                        <span style="color:var(--muted); font-weight:600;">Peripherals</span>
+                        <span>=</span>
+                        <span style="color:var(--text-1);">—</span>
+                        
                     </div>
                 </div>
             </div>
@@ -1362,24 +1374,27 @@
             <div id="dev-tab-software" style="display:none;">
                 <div class="card" style="margin-bottom:24px;">
                     <div class="card-title" style="margin-bottom:16px; font-size:16px; display:flex; align-items:center; gap:8px;">💻 Operating System & Security</div>
-                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; background: #f8fafc; padding: 20px; border-radius: 8px;">
-                        <div>
-                            <div style="color:var(--muted); font-size: 12px; font-weight:600; text-transform:uppercase; margin-bottom:4px;">Operating System</div>
-                            <div id="specOs" style="font-size:14px; font-weight:500; color:var(--text-1);">—</div>
-                            <div id="specOsVer" style="font-size:13px; color:var(--text-2); margin-top:2px;">—</div>
-                        </div>
-                        <div>
-                            <div style="color:var(--muted); font-size: 12px; font-weight:600; text-transform:uppercase; margin-bottom:4px;">Security & Antivirus</div>
-                            <div id="specAv" style="font-size:14px; font-weight:500; color:var(--text-1);">—</div>
-                        </div>
-                        <div>
-                            <div style="color:var(--muted); font-size: 12px; font-weight:600; text-transform:uppercase; margin-bottom:4px;">User Accounts</div>
-                            <div style="font-size:14px; font-weight:500; color:var(--text-1);">—</div>
-                        </div>
-                        <div>
-                            <div style="color:var(--muted); font-size: 12px; font-weight:600; text-transform:uppercase; margin-bottom:4px;">Audit Information</div>
-                            <div style="font-size:14px; font-weight:500; color:var(--text-1);">—</div>
-                        </div>
+                    <div style="display:grid; grid-template-columns: max-content max-content 1fr; gap: 12px 16px; background: #f8fafc; padding: 20px; border-radius: 8px; font-size:14px;">
+                        
+                        <span style="color:var(--muted); font-weight:600;">Operating System</span>
+                        <span>=</span>
+                        <span style="color:var(--text-1);">
+                            <span id="specOs">—</span>
+                            <span id="specOsVer" style="color:var(--text-2); margin-left:8px; font-size:13px;"></span>
+                        </span>
+                        
+                        <span style="color:var(--muted); font-weight:600;">Security & Antivirus</span>
+                        <span>=</span>
+                        <span id="specAv" style="color:var(--text-1);">—</span>
+                        
+                        <span style="color:var(--muted); font-weight:600;">User Accounts</span>
+                        <span>=</span>
+                        <span style="color:var(--text-1);">—</span>
+                        
+                        <span style="color:var(--muted); font-weight:600;">Audit Information</span>
+                        <span>=</span>
+                        <span style="color:var(--text-1);">—</span>
+                        
                     </div>
                 </div>
             <!-- Login History Card -->
@@ -1522,39 +1537,40 @@
             <div id="dev-tab-assets" style="display:none;">
                 <div class="card" style="margin-bottom:24px;">
                     <div class="card-title" style="margin-bottom:16px; font-size:16px; display:flex; align-items:center; gap:8px;">📦 Asset Details</div>
-                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; background: #f8fafc; padding: 20px; border-radius: 8px;">
-                        <div>
-                            <div style="color:var(--muted); font-size: 12px; font-weight:600; text-transform:uppercase; margin-bottom:4px;">Owner</div>
-                            <div style="font-size:14px; font-weight:500; color:var(--text-1);">—</div>
-                        </div>
-                        <div>
-                            <div style="color:var(--muted); font-size: 12px; font-weight:600; text-transform:uppercase; margin-bottom:4px;">Status</div>
-                            <div style="font-size:14px; font-weight:500; color:var(--text-1);">—</div>
-                        </div>
-                        <div>
-                            <div style="color:var(--muted); font-size: 12px; font-weight:600; text-transform:uppercase; margin-bottom:4px;">Vendor</div>
-                            <div style="font-size:14px; font-weight:500; color:var(--text-1);">—</div>
-                        </div>
-                        <div>
-                            <div style="color:var(--muted); font-size: 12px; font-weight:600; text-transform:uppercase; margin-bottom:4px;">Purchase Information</div>
-                            <div style="font-size:14px; font-weight:500; color:var(--text-1);">—</div>
-                        </div>
-                        <div>
-                            <div style="color:var(--muted); font-size: 12px; font-weight:600; text-transform:uppercase; margin-bottom:4px;">Warranty</div>
-                            <div style="font-size:14px; font-weight:500; color:var(--text-1);">—</div>
-                        </div>
-                        <div>
-                            <div style="color:var(--muted); font-size: 12px; font-weight:600; text-transform:uppercase; margin-bottom:4px;">Purchase Order</div>
-                            <div style="font-size:14px; font-weight:500; color:var(--text-1);">—</div>
-                        </div>
-                        <div>
-                            <div style="color:var(--muted); font-size: 12px; font-weight:600; text-transform:uppercase; margin-bottom:4px;">Tickets</div>
-                            <div style="font-size:14px; font-weight:500; color:var(--text-1);">—</div>
-                        </div>
-                        <div>
-                            <div style="color:var(--muted); font-size: 12px; font-weight:600; text-transform:uppercase; margin-bottom:4px;">Licensing</div>
-                            <div style="font-size:14px; font-weight:500; color:var(--text-1);">—</div>
-                        </div>
+                    <div style="display:grid; grid-template-columns: max-content max-content 1fr; gap: 12px 16px; background: #f8fafc; padding: 20px; border-radius: 8px; font-size:14px;">
+                        
+                        <span style="color:var(--muted); font-weight:600;">Owner</span>
+                        <span>=</span>
+                        <span style="color:var(--text-1);">—</span>
+                        
+                        <span style="color:var(--muted); font-weight:600;">Status</span>
+                        <span>=</span>
+                        <span style="color:var(--text-1);">—</span>
+                        
+                        <span style="color:var(--muted); font-weight:600;">Vendor</span>
+                        <span>=</span>
+                        <span style="color:var(--text-1);">—</span>
+                        
+                        <span style="color:var(--muted); font-weight:600;">Purchase Information</span>
+                        <span>=</span>
+                        <span style="color:var(--text-1);">—</span>
+                        
+                        <span style="color:var(--muted); font-weight:600;">Warranty</span>
+                        <span>=</span>
+                        <span style="color:var(--text-1);">—</span>
+                        
+                        <span style="color:var(--muted); font-weight:600;">Purchase Order</span>
+                        <span>=</span>
+                        <span style="color:var(--text-1);">—</span>
+                        
+                        <span style="color:var(--muted); font-weight:600;">Tickets</span>
+                        <span>=</span>
+                        <span style="color:var(--text-1);">—</span>
+                        
+                        <span style="color:var(--muted); font-weight:600;">Licensing</span>
+                        <span>=</span>
+                        <span style="color:var(--text-1);">—</span>
+                        
                     </div>
                 </div>
             </div>
@@ -2231,12 +2247,25 @@ async function refreshDeviceList() {
         const sel  = document.getElementById('deviceSelector');
         const curr = sel.value;
         sel.innerHTML = '<option value="">— Select a device —</option>';
+        
+        const groups = {};
         (data.devices || []).forEach(d => {
-            const opt = document.createElement('option');
-            opt.value       = d.id || d.computer_name;
-            opt.textContent = `${d.computer_name}  (${d.os_name || ''}) — ${d.last_seen || 'Unknown'}`;
-            if (opt.value === curr) opt.selected = true;
-            sel.appendChild(opt);
+            const datePart = d.last_seen ? d.last_seen.split('_')[0].split(' ')[0] : 'Unknown Date';
+            if (!groups[datePart]) groups[datePart] = [];
+            groups[datePart].push(d);
+        });
+        
+        Object.keys(groups).forEach(date => {
+            const optgroup = document.createElement('optgroup');
+            optgroup.label = `--------- ${date} ---------`;
+            groups[date].forEach(d => {
+                const opt = document.createElement('option');
+                opt.value       = d.id || d.computer_name;
+                opt.textContent = `${d.computer_name}  (${d.os_name || ''}) — ${d.last_seen || 'Unknown'}`;
+                if (opt.value === curr) opt.selected = true;
+                optgroup.appendChild(opt);
+            });
+            sel.appendChild(optgroup);
         });
     } catch(e) { console.error(e); }
 }
@@ -2265,9 +2294,20 @@ async function loadSoftwareForDevice() {
         document.getElementById('specOsVer').textContent = data.os_version ? `Build ${data.os_version}` : '—';
         document.getElementById('specCpu').textContent = hw.cpu || '—';
         document.getElementById('specRam').textContent = hw.ram || '—';
-        document.getElementById('specDisk').textContent = hw.disk || '—';
+        
+        let diskHtml = '—';
+        if (hw.disk) {
+            let diskLines = hw.disk.split('\n').filter(l => l.trim() !== '');
+            if (diskLines.length > 0) {
+                diskHtml = diskLines.join('<br>');
+            }
+        }
+        document.getElementById('specDisk').innerHTML = diskHtml;
+        
         document.getElementById('specModel').textContent = (hw.manufacturer && hw.model) ? `${hw.manufacturer} ${hw.model}` : '—';
-        document.getElementById('specSerial').textContent = hw.serial_number ? `S/N: ${hw.serial_number}` : '—';
+        document.getElementById('specSerial').textContent = hw.serial_number || '—';
+        document.getElementById('specHostname').textContent = data.computer_name || '—';
+        document.getElementById('specArch').textContent = data.architecture || '—';
         document.getElementById('specAv').textContent = data.antivirus || '—';
 
         // Populate Login History
@@ -2570,6 +2610,27 @@ async function refreshWifiNetworks() {
     } finally {
         btn.disabled = false;
         btn.innerHTML = "🔄 Refresh";
+    }
+}
+
+function switchDeviceTab(tabId) {
+    document.getElementById('dev-tab-hardware').style.display = 'none';
+    document.getElementById('dev-tab-software').style.display = 'none';
+    document.getElementById('dev-tab-assets').style.display = 'none';
+
+    document.querySelectorAll('.dev-tab-btn').forEach(btn => {
+        btn.style.background = 'transparent';
+        btn.style.borderColor = 'transparent';
+        btn.style.color = 'var(--text-2)';
+    });
+
+    document.getElementById('dev-tab-' + tabId).style.display = 'block';
+    
+    const activeBtn = document.getElementById('dev-btn-' + tabId);
+    if (activeBtn) {
+        activeBtn.style.background = 'var(--surface-3)';
+        activeBtn.style.borderColor = 'var(--primary)';
+        activeBtn.style.color = 'var(--primary)';
     }
 }
 
