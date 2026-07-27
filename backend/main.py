@@ -1177,6 +1177,7 @@ def download_device_pdf(device_id: str):
     """Find the latest PDF report for a given device_id and return it as a download."""
     best_pdf = None
     best_ts  = ""
+    computer_name = device_id
 
     if os_module.path.exists(USER_INFO_DIR):
         for fn in os_module.listdir(USER_INFO_DIR):
@@ -1197,16 +1198,16 @@ def download_device_pdf(device_id: str):
                     if os_module.path.exists(pdf_path):
                         best_ts  = ts
                         best_pdf = pdf_path
+                        computer_name = name
             except Exception:
                 pass
 
     if not best_pdf:
         raise HTTPException(
             status_code=404,
-            detail=f"No PDF report found for device: {computer_name}"
+            detail=f"No PDF report found for device: {device_id}"
         )
 
-    computer_name = None
     safe_name = "".join(x for x in computer_name if x.isalnum() or x in "._- ").strip()
     filename  = f"AuditReport_{safe_name}.pdf"
     return FileResponse(

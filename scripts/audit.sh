@@ -50,7 +50,32 @@ fi
 DRIVE_NAME="No CD Unit Found"
 COMPRESSION_UTILITIES='["tar", "gzip", "zip (built-in)"]'
 ANTIVIRUS='["Built-in OS Protections"]'
-PRINTERS="[]"
+PRINTERS=$(python3 - 2>/dev/null <<'PYEOF'
+import subprocess, json, re
+printers = []
+try:
+    r = subprocess.run(['lpstat', '-p'], capture_output=True, text=True, timeout=10)
+    for line in r.stdout.split('\n'):
+        if line.startswith('printer '):
+            parts = line.split(' ')
+            name = parts[1]
+            status = ' '.join(parts[2:]).split('.')[0] if len(parts) > 2 else "Unknown"
+            printers.append({
+                "name": name,
+                "port_name": "Unknown",
+                "driver_name": "Unknown",
+                "printer_status": status.strip(),
+                "extended_printer_status": "0"
+            })
+except Exception:
+    pass
+print(json.dumps(printers))
+PYEOF
+)
+if [ -z "$PRINTERS" ] || [ "$PRINTERS" = "null" ]; then
+    PRINTERS="[]"
+fi
+
 
 # ── Basic Hardware: CPU, RAM, Disk ────────────────────────────────────────────
 CPU="Unknown"
@@ -181,7 +206,7 @@ except:
 PYEOF
 )
     elif command -v lsblk >/dev/null 2>&1; then
-        DISK_PARTITIONS_JSON=$(lsblk -J -o NAME,SIZE,TYPE,MOUNTPOINT 2>/dev/null | python3 - <<'PYEOF'
+        DISK_PARTITIONS_JSON=$(lsblk -J -o NAME,SIZE,TYPE,MOUNTPOINT 2>/dev/null | python3 -c '
 import sys, json
 try:
     data = json.load(sys.stdin)
@@ -195,13 +220,56 @@ try:
     print(json.dumps(partitions))
 except:
     print("[]")
-PYEOF
-)
+')
     fi
 fi
 
-# Peripherals — not practical to collect in bash, leave empty for Unix
-PERIPHERALS_JSON="[]"
+# Peripherals
+PERIPHERALS_JSON=$(python3 - 2>/dev/null <<'PYEOF'
+import subprocess, json
+devices = []
+try:
+    r = subprocess.run(['lsusb'], capture_output=True, text=True, timeout=10)
+    for line in r.stdout.split('\n'):
+        if 'ID ' in line:
+            parts = line.split('ID ')[1].split(' ')
+            device_id = parts[0]
+            name = ' '.join(parts[1:]).strip()
+            if name:
+                devices.append({
+                    "name": name,
+                    "device_id": device_id,
+                    "manufacturer": "Unknown",
+                    "status": "OK"
+                })
+except Exception:
+    pass
+# MacOS
+try:
+    if not devices:
+        r = subprocess.run(['system_profiler', 'SPUSBDataType', '-json'], capture_output=True, text=True, timeout=15)
+        data = json.loads(r.stdout).get("SPUSBDataType", [])
+        def get_usb(items):
+            for i in items:
+                if i.get("_name") and not i.get("_name", "").endswith("Bus"):
+                    devices.append({
+                        "name": i.get("_name"),
+                        "device_id": i.get("product_id", "Unknown"),
+                        "manufacturer": i.get("manufacturer", "Unknown"),
+                        "status": "OK"
+                    })
+                if i.get("_items"):
+                    get_usb(i["_items"])
+        get_usb(data)
+except Exception:
+    pass
+print(json.dumps(devices))
+PYEOF
+)
+if [ -z "$PERIPHERALS_JSON" ] || [ "$PERIPHERALS_JSON" = "null" ]; then
+    PERIPHERALS_JSON="[]"
+fi
+
 
 # ────────────────────────────────────────────────────────────────────────────
 #  PHASE 2 — FULL SOFTWARE INVENTORY
@@ -239,7 +307,7 @@ PYEOF
     else
         # Try dpkg (Debian/Ubuntu)
         SOFTWARE_INVENTORY_JSON=$(python3 - <<'PYEOF'
-import subprocess, json
+import subprocess, json, sys
 apps = []
 try:
     r = subprocess.run(
@@ -254,8 +322,8 @@ try:
             apps.append({'name': parts[0].strip(), 'version': parts[1].strip(), 'publisher': '', 'install_date': 'Unknown', 'size_mb': size_str})
     if apps:
         print(json.dumps(apps))
-        exit()
-except:
+        sys.exit(0)
+except Exception:
     pass
 # Try rpm (RHEL/CentOS/Fedora)
 try:
@@ -269,7 +337,7 @@ try:
             size_b = int(parts[2].strip()) if len(parts) > 2 and parts[2].strip().isdigit() else 0
             size_str = f"{round(size_b/1048576,2)} MB" if size_b > 0 else "Unknown"
             apps.append({'name': parts[0].strip(), 'version': parts[1].strip(), 'publisher': '', 'install_date': 'Unknown', 'size_mb': size_str})
-except:
+except Exception:
     pass
 print(json.dumps(apps))
 PYEOF
