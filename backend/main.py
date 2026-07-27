@@ -30,6 +30,17 @@ import tempfile
 import time
 import re
 import platform
+mac_vendor_dict = {}
+try:
+    cache_path = os.path.expanduser("~/.cache/mac-vendors.txt")
+    if os.path.exists(cache_path):
+        with open(cache_path, "r", encoding="utf-8") as f:
+            for line in f:
+                parts = line.strip().split(":", 1)
+                if len(parts) == 2:
+                    mac_vendor_dict[parts[0]] = parts[1]
+except Exception as e:
+    pass
 
 # ── Directories & Logging ────────────────────────────────────────────────────
 LOGS_DIR          = "logs"
@@ -1366,7 +1377,18 @@ def network_scan(request: NetworkScanRequest):
                 elif any(x in h_lower for x in ["android", "iphone", "ipad", "samsung", "pixel"]):
                     dev_type = "Mobile Device"
                 else:
-                    dev_type = "Unknown Device (Firewalled)"
+                    try:
+                        prefix = mac_str.replace(":", "").replace("-", "").upper()[:6]
+                        if prefix in mac_vendor_dict:
+                            vendor = mac_vendor_dict[prefix]
+                            vendor = vendor.replace(" Inc.", "").replace(" Ltd.", "").replace(" Co.", "").replace(", Inc.", "").replace(" Corporation", "")
+                            if len(vendor) > 20:
+                                vendor = vendor[:20].strip() + "..."
+                            dev_type = f"{vendor} Device"
+                        else:
+                            dev_type = "Unknown Device (Firewalled)"
+                    except Exception:
+                        dev_type = "Unknown Device (Firewalled)"
 
                 discovered_dict[ip_str] = {
                     "ip":          ip_str,

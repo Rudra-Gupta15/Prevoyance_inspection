@@ -1293,7 +1293,7 @@
 
         <!-- Software & Hardware Panel -->
         <div id="softwarePanel" style="display:none;">
-            <!-- System Specifications Card -->
+            <!-- Device Details Header -->
             <div class="card" style="margin-bottom:24px; border-top: 4px solid var(--primary);">
                 <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 20px;">
                     <div>
@@ -1308,36 +1308,80 @@
                     </div>
                 </div>
                 
-                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; background: #f8fafc; padding: 20px; border-radius: 8px;">
-                    <div>
-                        <div style="color:var(--muted); font-size: 12px; font-weight:600; text-transform:uppercase; margin-bottom:4px;">Operating System</div>
-                        <div id="specOs" style="font-size:14px; font-weight:500; color:var(--text-1);">—</div>
-                        <div id="specOsVer" style="font-size:13px; color:var(--text-2); margin-top:2px;">—</div>
-                    </div>
-                    <div>
-                        <div style="color:var(--muted); font-size: 12px; font-weight:600; text-transform:uppercase; margin-bottom:4px;">Processor (CPU)</div>
-                        <div id="specCpu" style="font-size:14px; font-weight:500; color:var(--text-1);">—</div>
-                    </div>
-                    <div>
-                        <div style="color:var(--muted); font-size: 12px; font-weight:600; text-transform:uppercase; margin-bottom:4px;">Memory (RAM)</div>
-                        <div id="specRam" style="font-size:14px; font-weight:500; color:var(--text-1);">—</div>
-                    </div>
-                    <div>
-                        <div style="color:var(--muted); font-size: 12px; font-weight:600; text-transform:uppercase; margin-bottom:4px;">Storage Drives</div>
-                        <div id="specDisk" style="font-size:14px; font-weight:500; color:var(--text-1);">—</div>
-                    </div>
-                    <div>
-                        <div style="color:var(--muted); font-size: 12px; font-weight:600; text-transform:uppercase; margin-bottom:4px;">Manufacturer / Model</div>
-                        <div id="specModel" style="font-size:14px; font-weight:500; color:var(--text-1);">—</div>
-                        <div id="specSerial" style="font-size:13px; color:var(--text-2); margin-top:2px;">—</div>
-                    </div>
-                    <div>
-                        <div style="color:var(--muted); font-size: 12px; font-weight:600; text-transform:uppercase; margin-bottom:4px;">Security & Antivirus</div>
-                        <div id="specAv" style="font-size:14px; font-weight:500; color:var(--text-1);">—</div>
+                <!-- TABS ROW -->
+                <div style="display:flex; gap:12px; border-top:1px solid var(--border); padding-top:16px;">
+                    <button class="btn btn-outline dev-tab-btn" id="dev-btn-hardware" onclick="switchDeviceTab('hardware')" style="background:var(--surface-3); border-color:var(--primary); color:var(--primary);">🖥 Hardware</button>
+                    <button class="btn btn-outline dev-tab-btn" id="dev-btn-software" onclick="switchDeviceTab('software')" style="border-color:transparent; color:var(--text-2);">💻 Software</button>
+                    <button class="btn btn-outline dev-tab-btn" id="dev-btn-assets" onclick="switchDeviceTab('assets')" style="border-color:transparent; color:var(--text-2);">📦 Asset Management</button>
+                </div>
+            </div>
+
+            <!-- HARDWARE TAB -->
+            <div id="dev-tab-hardware" style="display:block;">
+                <div class="card" style="margin-bottom:24px;">
+                    <div class="card-title" style="margin-bottom:16px; font-size:16px; display:flex; align-items:center; gap:8px;">🖥 System Information</div>
+                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; background: #f8fafc; padding: 20px; border-radius: 8px;">
+                        <div>
+                            <div style="color:var(--muted); font-size: 12px; font-weight:600; text-transform:uppercase; margin-bottom:4px;">Manufacturer / Model</div>
+                            <div id="specModel" style="font-size:14px; font-weight:500; color:var(--text-1);">—</div>
+                            <div id="specSerial" style="font-size:13px; color:var(--text-2); margin-top:2px;">—</div>
+                        </div>
+                        <div>
+                            <div style="color:var(--muted); font-size: 12px; font-weight:600; text-transform:uppercase; margin-bottom:4px;">Processor (CPU)</div>
+                            <div id="specCpu" style="font-size:14px; font-weight:500; color:var(--text-1);">—</div>
+                        </div>
+                        <div>
+                            <div style="color:var(--muted); font-size: 12px; font-weight:600; text-transform:uppercase; margin-bottom:4px;">Memory (RAM)</div>
+                            <div id="specRam" style="font-size:14px; font-weight:500; color:var(--text-1);">—</div>
+                        </div>
+                        <div>
+                            <div style="color:var(--muted); font-size: 12px; font-weight:600; text-transform:uppercase; margin-bottom:4px;">Storage Drives</div>
+                            <div id="specDisk" style="font-size:14px; font-weight:500; color:var(--text-1);">—</div>
+                        </div>
+                        <div>
+                            <div style="color:var(--muted); font-size: 12px; font-weight:600; text-transform:uppercase; margin-bottom:4px;">Graphics</div>
+                            <div style="font-size:14px; font-weight:500; color:var(--text-1);">—</div>
+                        </div>
+                        <div>
+                            <div style="color:var(--muted); font-size: 12px; font-weight:600; text-transform:uppercase; margin-bottom:4px;">BIOS / Firmware</div>
+                            <div style="font-size:14px; font-weight:500; color:var(--text-1);">—</div>
+                        </div>
+                        <div>
+                            <div style="color:var(--muted); font-size: 12px; font-weight:600; text-transform:uppercase; margin-bottom:4px;">Network Hardware</div>
+                            <div style="font-size:14px; font-weight:500; color:var(--text-1);">—</div>
+                        </div>
+                        <div>
+                            <div style="color:var(--muted); font-size: 12px; font-weight:600; text-transform:uppercase; margin-bottom:4px;">Peripherals</div>
+                            <div style="font-size:14px; font-weight:500; color:var(--text-1);">—</div>
+                        </div>
                     </div>
                 </div>
             </div>
 
+            <!-- SOFTWARE TAB -->
+            <div id="dev-tab-software" style="display:none;">
+                <div class="card" style="margin-bottom:24px;">
+                    <div class="card-title" style="margin-bottom:16px; font-size:16px; display:flex; align-items:center; gap:8px;">💻 Operating System & Security</div>
+                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; background: #f8fafc; padding: 20px; border-radius: 8px;">
+                        <div>
+                            <div style="color:var(--muted); font-size: 12px; font-weight:600; text-transform:uppercase; margin-bottom:4px;">Operating System</div>
+                            <div id="specOs" style="font-size:14px; font-weight:500; color:var(--text-1);">—</div>
+                            <div id="specOsVer" style="font-size:13px; color:var(--text-2); margin-top:2px;">—</div>
+                        </div>
+                        <div>
+                            <div style="color:var(--muted); font-size: 12px; font-weight:600; text-transform:uppercase; margin-bottom:4px;">Security & Antivirus</div>
+                            <div id="specAv" style="font-size:14px; font-weight:500; color:var(--text-1);">—</div>
+                        </div>
+                        <div>
+                            <div style="color:var(--muted); font-size: 12px; font-weight:600; text-transform:uppercase; margin-bottom:4px;">User Accounts</div>
+                            <div style="font-size:14px; font-weight:500; color:var(--text-1);">—</div>
+                        </div>
+                        <div>
+                            <div style="color:var(--muted); font-size: 12px; font-weight:600; text-transform:uppercase; margin-bottom:4px;">Audit Information</div>
+                            <div style="font-size:14px; font-weight:500; color:var(--text-1);">—</div>
+                        </div>
+                    </div>
+                </div>
             <!-- Login History Card -->
             <div class="card" style="margin-bottom:24px; border-top: 4px solid var(--info);">
                 <div class="card-title" style="margin-bottom:16px;">Recent Logins</div>
@@ -1470,8 +1514,52 @@
                 </div>
             </div>
 
-        </div>
+        
 
+            </div>
+
+            <!-- ASSET MANAGEMENT TAB -->
+            <div id="dev-tab-assets" style="display:none;">
+                <div class="card" style="margin-bottom:24px;">
+                    <div class="card-title" style="margin-bottom:16px; font-size:16px; display:flex; align-items:center; gap:8px;">📦 Asset Details</div>
+                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; background: #f8fafc; padding: 20px; border-radius: 8px;">
+                        <div>
+                            <div style="color:var(--muted); font-size: 12px; font-weight:600; text-transform:uppercase; margin-bottom:4px;">Owner</div>
+                            <div style="font-size:14px; font-weight:500; color:var(--text-1);">—</div>
+                        </div>
+                        <div>
+                            <div style="color:var(--muted); font-size: 12px; font-weight:600; text-transform:uppercase; margin-bottom:4px;">Status</div>
+                            <div style="font-size:14px; font-weight:500; color:var(--text-1);">—</div>
+                        </div>
+                        <div>
+                            <div style="color:var(--muted); font-size: 12px; font-weight:600; text-transform:uppercase; margin-bottom:4px;">Vendor</div>
+                            <div style="font-size:14px; font-weight:500; color:var(--text-1);">—</div>
+                        </div>
+                        <div>
+                            <div style="color:var(--muted); font-size: 12px; font-weight:600; text-transform:uppercase; margin-bottom:4px;">Purchase Information</div>
+                            <div style="font-size:14px; font-weight:500; color:var(--text-1);">—</div>
+                        </div>
+                        <div>
+                            <div style="color:var(--muted); font-size: 12px; font-weight:600; text-transform:uppercase; margin-bottom:4px;">Warranty</div>
+                            <div style="font-size:14px; font-weight:500; color:var(--text-1);">—</div>
+                        </div>
+                        <div>
+                            <div style="color:var(--muted); font-size: 12px; font-weight:600; text-transform:uppercase; margin-bottom:4px;">Purchase Order</div>
+                            <div style="font-size:14px; font-weight:500; color:var(--text-1);">—</div>
+                        </div>
+                        <div>
+                            <div style="color:var(--muted); font-size: 12px; font-weight:600; text-transform:uppercase; margin-bottom:4px;">Tickets</div>
+                            <div style="font-size:14px; font-weight:500; color:var(--text-1);">—</div>
+                        </div>
+                        <div>
+                            <div style="color:var(--muted); font-size: 12px; font-weight:600; text-transform:uppercase; margin-bottom:4px;">Licensing</div>
+                            <div style="font-size:14px; font-weight:500; color:var(--text-1);">—</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
         <div id="swEmpty" class="card">
             <div class="empty-state">
                 <div class="empty-icon">💿</div>
@@ -1541,6 +1629,7 @@
                         <div class="form-group">
                             <label for="connectSsid">Selected Network (SSID)</label>
                             <input type="text" id="connectSsid" class="input-field"
+                                onblur="if(this.value) { const p = localStorage.getItem('wifi_pwd_' + this.value.trim()); if(p) document.getElementById('connectPassword').value = p; }"
                                 placeholder="Click a network or type SSID…">
                         </div>
                         <div class="form-group">
@@ -2464,7 +2553,7 @@ async function refreshWifiNetworks() {
                 <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 16px; background:var(--surface-2); border:1px solid var(--border); border-radius:8px; cursor:pointer; transition:all 0.15s;" 
                      onmouseover="this.style.borderColor='var(--primary-lt)'" 
                      onmouseout="this.style.borderColor='var(--border)'"
-                     onclick="document.getElementById('connectSsid').value='${esc(n.ssid)}'; document.getElementById('connectPassword').focus();">
+                     onclick="selectWifi('${esc(n.ssid)}')">
                     <div style="display:flex; align-items:center; gap:12px;">
                         <span style="font-size:18px;">${bars}</span>
                         <div>
@@ -2482,6 +2571,18 @@ async function refreshWifiNetworks() {
         btn.disabled = false;
         btn.innerHTML = "🔄 Refresh";
     }
+}
+
+function selectWifi(ssid) {
+    document.getElementById('connectSsid').value = ssid;
+    const pwdField = document.getElementById('connectPassword');
+    const savedPwd = localStorage.getItem('wifi_pwd_' + ssid);
+    if (savedPwd) {
+        pwdField.value = savedPwd;
+    } else {
+        pwdField.value = '';
+    }
+    pwdField.focus();
 }
 
 async function connectToWifi() {
@@ -2508,6 +2609,11 @@ async function connectToWifi() {
         const data = await r.json();
         
         if (r.ok && (data.status === 'connected' || data.status === 'connecting')) {
+            // Save password to local storage for future use
+            if (pwd) {
+                localStorage.setItem('wifi_pwd_' + ssid, pwd);
+            }
+            
             statusEl.className = 'alert alert-success';
             statusEl.textContent = `✅ Connected to ${ssid}. Subnet: ${data.subnet || 'Pending'}. Auto-starting device scan...`;
             
