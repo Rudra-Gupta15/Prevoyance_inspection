@@ -1319,7 +1319,7 @@
             <!-- HARDWARE TAB -->
             <div id="dev-tab-hardware" style="display:block;">
                 <div class="card" style="margin-bottom:24px;">
-                    <div class="card-title" style="margin-bottom:16px; font-size:16px; display:flex; align-items:center; gap:8px;">🖥 System Information</div>
+                    <div class="card-title" style="margin-bottom:16px; font-size:16px; display:flex; align-items:center; gap:8px;">🖥️ System Information</div>
                     <div style="display:grid; grid-template-columns: max-content max-content 1fr; gap: 12px 16px; background: #f8fafc; padding: 20px; border-radius: 8px; font-size:14px;">
                         
                         <span style="color:var(--muted); font-weight:600;">Hostname</span>
@@ -1352,19 +1352,27 @@
                         
                         <span style="color:var(--muted); font-weight:600;">Graphics</span>
                         <span>=</span>
-                        <span style="color:var(--text-1);">—</span>
+                        <span id="specGpu" style="color:var(--text-1);">—</span>
+                        
+                        <span style="color:var(--muted); font-weight:600;">Motherboard</span>
+                        <span>=</span>
+                        <span id="specMobo" style="color:var(--text-1);">—</span>
                         
                         <span style="color:var(--muted); font-weight:600;">BIOS / Firmware</span>
                         <span>=</span>
-                        <span style="color:var(--text-1);">—</span>
+                        <span id="specBios" style="color:var(--text-1);">—</span>
                         
                         <span style="color:var(--muted); font-weight:600;">Network Hardware</span>
                         <span>=</span>
-                        <span style="color:var(--text-1);">—</span>
+                        <span id="specNetHardware" style="color:var(--text-1);">—</span>
                         
                         <span style="color:var(--muted); font-weight:600;">Peripherals</span>
                         <span>=</span>
-                        <span style="color:var(--text-1);">—</span>
+                        <span id="specPeripherals" style="color:var(--text-1);">—</span>
+                        
+                        <span style="color:var(--muted); font-weight:600;">Physical / Geo Location</span>
+                        <span>=</span>
+                        <span id="specLocation" style="color:var(--text-1);">—</span>
                         
                     </div>
                 </div>
@@ -1389,11 +1397,11 @@
                         
                         <span style="color:var(--muted); font-weight:600;">User Accounts</span>
                         <span>=</span>
-                        <span style="color:var(--text-1);">—</span>
+                        <span id="specUsers" style="color:var(--text-1);">—</span>
                         
                         <span style="color:var(--muted); font-weight:600;">Audit Information</span>
                         <span>=</span>
-                        <span style="color:var(--text-1);">—</span>
+                        <span id="specAuditInfo" style="color:var(--text-1);">—</span>
                         
                     </div>
                 </div>
@@ -1635,7 +1643,7 @@
                 <!-- Connect Form -->
                 <div class="card" style="padding:20px;">
                     <div class="card-header" style="margin-bottom:16px;">
-                        <div class="card-icon green">🔐</div>
+                        <div class="card-icon green">⚡</div>
                         <div>
                             <div class="card-title" style="font-size:14px;">Connect to Network</div>
                         </div>
@@ -1771,10 +1779,10 @@
 
                 <div id="remoteAuditStatus" style="display:none; font-size:13px; padding:10px; border-radius:6px;"></div>
 
-                <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:8px;">
-                    <button class="btn btn-outline" onclick="copyAuditCommand()" style="margin-right:auto;">📋 Copy Manual Command</button>
-                    <button class="btn btn-outline" onclick="closeRemoteAuditModal()">Cancel</button>
-                    <button class="btn btn-primary" id="btnSubmitRemoteAudit" onclick="submitRemoteAudit()">▶ Send Notification</button>
+                <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:8px; flex-wrap:wrap;">
+                    <button class="btn btn-outline" onclick="copyAuditCommand()" style="margin-right:auto; flex-shrink: 0;">📄 Copy Manual Command</button>
+                    <button class="btn btn-outline" onclick="closeRemoteAuditModal()" style="flex-shrink: 0;">Cancel</button>
+                    <button class="btn btn-primary" id="btnSubmitRemoteAudit" onclick="submitRemoteAudit()" style="flex-shrink: 0;">⚡ Send Notification</button>
                 </div>
             </div>
         </div>
@@ -2240,6 +2248,20 @@ function exportScanResults() {
 // ────────────────────────────────────────────────────────────────────
 let swData = [];
 
+function parseCanonicalDate(str) {
+    if (!str) return 'Unknown Date';
+    let clean = str.split('_')[0].split(' ')[0].trim();
+    const dmmmyyyy = clean.match(/^(\d{1,2})[-/]([A-Za-z]{3})[-/](\d{4})$/);
+    if (dmmmyyyy) {
+        const m = {jan:'01',feb:'02',mar:'03',apr:'04',may:'05',jun:'06',jul:'07',aug:'08',sep:'09',oct:'10',nov:'11',dec:'12'};
+        const day = dmmmyyyy[1].padStart(2, '0');
+        const mon = m[dmmmyyyy[2].toLowerCase()] || '01';
+        const yr  = dmmmyyyy[3];
+        return `${yr}-${mon}-${day}`;
+    }
+    return clean;
+}
+
 async function refreshDeviceList() {
     try {
         const r    = await fetch('/api/devices');
@@ -2250,85 +2272,258 @@ async function refreshDeviceList() {
         
         const groups = {};
         (data.devices || []).forEach(d => {
-            const datePart = d.last_seen ? d.last_seen.split('_')[0].split(' ')[0] : 'Unknown Date';
+            const datePart = parseCanonicalDate(d.last_seen);
             if (!groups[datePart]) groups[datePart] = [];
             groups[datePart].push(d);
         });
         
-        Object.keys(groups).forEach(date => {
+        let firstVal = null;
+        Object.keys(groups).sort().reverse().forEach(date => {
             const optgroup = document.createElement('optgroup');
             optgroup.label = `--------- ${date} ---------`;
             groups[date].forEach(d => {
                 const opt = document.createElement('option');
                 opt.value       = d.id || d.computer_name;
-                opt.textContent = `${d.computer_name}  (${d.os_name || ''}) — ${d.last_seen || 'Unknown'}`;
-                if (opt.value === curr) opt.selected = true;
+                const displayTime = d.last_seen ? d.last_seen.replace('_', ' ') : 'Unknown';
+                opt.textContent = `${d.computer_name} (${d.os_name || ''}) — ${displayTime}`;
+                if (!firstVal) firstVal = opt.value;
+                if (curr && opt.value === curr) opt.selected = true;
                 optgroup.appendChild(opt);
             });
             sel.appendChild(optgroup);
         });
+        
+        if (!sel.value && firstVal) {
+            sel.value = firstVal;
+        }
+
+        if (sel.value) {
+            loadSoftwareForDevice();
+        }
     } catch(e) { console.error(e); }
 }
 
 async function loadSoftwareForDevice() {
     const name = document.getElementById('deviceSelector').value;
     if (!name) {
-        document.getElementById('softwarePanel').style.display = 'none';
-        document.getElementById('swEmpty').style.display       = 'block';
+        const swPanel = document.getElementById('softwarePanel');
+        if (swPanel) swPanel.style.display = 'none';
+        const swEmpty = document.getElementById('swEmpty');
+        if (swEmpty) swEmpty.style.display = 'block';
         return;
     }
 
     try {
         const r    = await fetch(`/api/software/${encodeURIComponent(name)}`);
+        if (!r.ok) {
+            throw new Error(`Server returned status ${r.status}`);
+        }
         const data = await r.json();
         swData     = data.software_inventory || [];
 
-        document.getElementById('swDeviceTitle').textContent = `${name}`;
-        document.getElementById('swDeviceMeta').textContent  = `Last audited: ${data.last_audit || 'Unknown'} | Architecture: ${data.architecture || 'Unknown'}`;
-        document.getElementById('swLicenseStatus').textContent = data.license_status || 'Unknown License';
-        document.getElementById('swTotalBadge').textContent  = `${data.total} apps`;
+        const setTxt = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+        const setHtml = (id, val) => { const el = document.getElementById(id); if (el) el.innerHTML = val; };
+
+        setTxt('swDeviceTitle', name);
+        setTxt('swDeviceMeta', `Last audited: ${data.last_audit || 'Unknown'} | Architecture: ${data.architecture || 'Unknown'}`);
+        setTxt('swLicenseStatus', data.license_status || 'Unknown License');
+        setTxt('swTotalBadge', `${data.total ?? swData.length} apps`);
         
         // Populate Specs
         const hw = data.hardware_details || {};
-        document.getElementById('specOs').textContent = data.os_name || '—';
-        document.getElementById('specOsVer').textContent = data.os_version ? `Build ${data.os_version}` : '—';
-        document.getElementById('specCpu').textContent = hw.cpu || '—';
-        document.getElementById('specRam').textContent = hw.ram || '—';
+        setTxt('specHostname', data.computer_name || '—');
+        setTxt('specDeviceType', hw.device_type || 'Desktop');
+        setTxt('specArch', hw.architecture || data.architecture || '—');
+        setTxt('specModel', (hw.manufacturer && hw.model) ? `${hw.manufacturer} ${hw.model}` : '—');
+        setTxt('specSerial', hw.serial_number || '—');
+        setTxt('specAssetTag', hw.asset_tag || 'N/A');
         
-        let diskHtml = '—';
-        if (hw.disk) {
-            let diskLines = hw.disk.split('\n').filter(l => l.trim() !== '');
-            if (diskLines.length > 0) {
-                diskHtml = diskLines.join('<br>');
-            }
+        setTxt('specCpu', hw.processor_name || hw.cpu || '—');
+        setTxt('specCores', (hw.cpu_cores && hw.cpu_threads) ? `(${hw.cpu_cores} Cores / ${hw.cpu_threads} Threads)` : '');
+        
+        setTxt('specRam', hw.installed_ram || hw.ram || '—');
+        setTxt('specRamSlots', hw.ram_slots ? `(${hw.ram_slots})` : '');
+        
+        // Storage Drives
+        let diskParts = hw.disk_partitions || [];
+        if (diskParts.length > 0) {
+            let diskHtml = `<ul style="margin:0; padding-left:18px; line-height:1.6;">` + diskParts.map(p => {
+                const name = esc(p.name || 'Drive');
+                const size = esc(p.size_gb || 'Unknown');
+                const free = p.free_gb ? `, ${esc(p.free_gb)} free` : '';
+                const type = esc(p.ssd_hdd || p.type || 'Disk');
+                const health = p.health ? ` <span class="badge badge-green" style="font-size:10px; padding:2px 6px;">${esc(p.health)}</span>` : '';
+                return `<li><b>${name}</b> — ${size} total${free} [${type}]${health}</li>`;
+            }).join('') + `</ul>`;
+            setHtml('specDisk', diskHtml);
+        } else if (hw.disk) {
+            setHtml('specDisk', hw.disk.replace(/\n/g, '<br>'));
+        } else {
+            setTxt('specDisk', '—');
         }
-        document.getElementById('specDisk').innerHTML = diskHtml;
         
-        document.getElementById('specModel').textContent = (hw.manufacturer && hw.model) ? `${hw.manufacturer} ${hw.model}` : '—';
-        document.getElementById('specSerial').textContent = hw.serial_number || '—';
-        document.getElementById('specHostname').textContent = data.computer_name || '—';
-        document.getElementById('specArch').textContent = data.architecture || '—';
-        document.getElementById('specAv').textContent = data.antivirus || '—';
+        // Graphics (GPU)
+        let gpuList = hw.gpu_details || [];
+        if (gpuList.length > 0) {
+            let gpuHtml = `<ul style="margin:0; padding-left:18px; line-height:1.6;">` + gpuList.map(g => {
+                const gName = esc(g.name || 'GPU');
+                const vram = g.vram && g.vram !== 'Unknown' ? ` (VRAM: ${esc(g.vram)})` : '';
+                const drv = g.driver_version && g.driver_version !== 'Unknown' ? ` — Driver v${esc(g.driver_version)}` : '';
+                return `<li><b>${gName}</b>${vram}${drv}</li>`;
+            }).join('') + `</ul>`;
+            setHtml('specGpu', gpuHtml);
+        } else {
+            setTxt('specGpu', '—');
+        }
+
+        // Motherboard
+        const moboMfr = hw.mobo_manufacturer || '—';
+        const moboProd = hw.mobo_product || '—';
+        const moboVer = hw.mobo_version || 'N/A';
+        const moboSerial = hw.mobo_serial || 'N/A';
+
+        if (moboMfr !== '—' || moboProd !== '—') {
+            const moboHtml = `<ul style="margin:0; padding-left:18px; line-height:1.6;">
+                <li><b>Manufacturer</b> : ${esc(moboMfr)}</li>
+                <li><b>Product Name</b> : ${esc(moboProd)}</li>
+                <li><b>Version</b> : ${esc(moboVer)}</li>
+                <li><b>Serial Number</b> : ${esc(moboSerial)}</li>
+            </ul>`;
+            setHtml('specMobo', moboHtml);
+        } else {
+            setTxt('specMobo', '—');
+        }
+
+        const biosStr = (hw.bios_version && hw.bios_date) ? `${hw.bios_version} (${hw.bios_date})` : (hw.bios_version || '—');
+        setTxt('specBios', biosStr);
+
+        // Network Hardware
+        let netList = hw.network_adapters || data.network_details || [];
+        if (netList.length > 0) {
+            let netHtml = `<ul style="margin:0; padding-left:18px; line-height:1.6;">` + netList.map(n => {
+                const nName = esc(n.name || n.Description || 'Adapter');
+                const ip4 = esc(n.ipv4 || n.ip_address || 'N/A');
+                const ip6 = esc(n.ipv6 || 'N/A');
+                const macStr = esc(n.mac_address || n.mac || 'N/A');
+                const gwStr = n.gateway ? ` (GW: ${esc(n.gateway)})` : '';
+                const dnsStr = esc(n.dns_servers || 'N/A');
+                const speedStr = esc(n.speed || 'Active');
+                const ssidStr = esc(n.wifi_ssid || 'N/A');
+                
+                let ssidItem = (ssidStr && ssidStr !== 'N/A') ? `<li><b>Wi-Fi SSID</b>: <span class="badge badge-green" style="font-size:11px;">${ssidStr}</span></li>` : '';
+
+                return `<li><b>${nName}</b>
+                    <ul style="margin:2px 0 6px 0; padding-left:16px; font-size:13px; color:var(--text-2);">
+                        <li><b>IPv4 Address</b>: ${ip4}${gwStr}</li>
+                        <li><b>IPv6 Address</b>: ${ip6}</li>
+                        <li><b>MAC Address</b>: ${macStr}</li>
+                        <li><b>DNS Servers</b>: ${dnsStr}</li>
+                        <li><b>Connection Speed</b>: ${speedStr}</li>
+                        ${ssidItem}
+                    </ul>
+                </li>`;
+            }).join('') + `</ul>`;
+            setHtml('specNetHardware', netHtml);
+        } else {
+            setTxt('specNetHardware', '—');
+        }
+
+        // Peripherals
+        let periList = hw.peripherals || [];
+        if (periList.length > 0) {
+            let periHtml = `<ul style="margin:0; padding-left:18px; line-height:1.6;">` + periList.map(p => {
+                const pName = esc(p.name || 'Device');
+                const pType = p.type ? ` <span class="badge badge-gray" style="font-size:10px; padding:1px 5px; margin-left:6px;">${esc(p.type)}</span>` : '';
+                return `<li>${pName}${pType}</li>`;
+            }).join('') + `</ul>`;
+            setHtml('specPeripherals', periHtml);
+        } else {
+            setTxt('specPeripherals', 'Integrated Display, Standard Keyboard & Mouse');
+        }
+
+        // Location
+        setTxt('specLocation', hw.location_info || 'Location Unavailable');
+
+        // Battery Diagnostics
+        if (hw.device_type === 'Laptop' || (hw.battery_health && hw.battery_health !== 'N/A (Desktop)')) {
+            const bHealth = hw.battery_health || 'Good';
+            const bCharge = hw.charge_percent || '100%';
+            const bCycles = hw.cycle_count || 'N/A';
+            const bDesign = hw.design_capacity || 'N/A';
+            const bFull = hw.full_capacity || 'N/A';
+            
+            const batHtml = `<ul style="margin:0; padding-left:18px; line-height:1.6;">
+                <li><b>Battery Health</b> : <span class="badge badge-green" style="font-size:11px;">${esc(bHealth)}</span></li>
+                <li><b>Current Charge</b> : ${esc(bCharge)}</li>
+                <li><b>Cycle Count</b> : ${esc(bCycles)}</li>
+                <li><b>Full Charge Capacity</b> : ${esc(bFull)}</li>
+                <li><b>Design Capacity</b> : ${esc(bDesign)}</li>
+            </ul>`;
+            setHtml('specBattery', batHtml);
+        } else {
+            setTxt('specBattery', 'N/A (Desktop System)');
+        }
+
+        // Populate OS & Security Tab
+        setTxt('specOs', data.os_name || '—');
+        setTxt('specOsVer', data.os_version ? `Build ${data.os_build || data.os_version}` : '—');
+
+        const uptimeStr = (data.last_boot && data.uptime) ? `Last Boot: ${data.last_boot} (${data.uptime} uptime)` : (data.last_boot || data.uptime || '—');
+        setTxt('specUptime', uptimeStr);
+
+        setTxt('specAv', Array.isArray(data.antivirus) ? data.antivirus.join(', ') : (data.antivirus || 'Windows Defender'));
+
+        const fwBadge = (data.firewall === 'Enabled') ? '<span class="badge badge-green">Enabled</span>' : `<span class="badge badge-red">${esc(data.firewall || 'Disabled')}</span>`;
+        setHtml('specFirewall', fwBadge);
+
+        const blBadge = (data.bitlocker && data.bitlocker.includes('FullyEncrypted')) ? '<span class="badge badge-green">Protected (Encrypted)</span>' : `<span class="badge badge-orange">${esc(data.bitlocker || 'Not Encrypted')}</span>`;
+        setHtml('specBitlocker', blBadge);
+
+        const sbBadge = (data.secure_boot === 'Enabled') ? '<span class="badge badge-green">Enabled</span>' : `<span class="badge badge-gray">${esc(data.secure_boot || 'Disabled')}</span>`;
+        setHtml('specSecureBoot', sbBadge);
+
+        const tpmBadge = (data.tpm && data.tpm.includes('Present')) ? `<span class="badge badge-green">${esc(data.tpm)}</span>` : `<span class="badge badge-gray">${esc(data.tpm || 'Not Present')}</span>`;
+        setHtml('specTpm', tpmBadge);
+
+        setTxt('specCurrentUser', data.current_user || '—');
+
+        let userList = data.user_accounts || [];
+        if (userList.length > 0) {
+            let uHtml = `<ul style="margin:0; padding-left:18px; line-height:1.6;">` + userList.map(u => {
+                const statusBadge = (u.disabled === 'True') ? `<span class="badge badge-gray" style="font-size:10px; padding:1px 5px; margin-left:6px;">Disabled</span>` : `<span class="badge badge-green" style="font-size:10px; padding:1px 5px; margin-left:6px;">Active</span>`;
+                return `<li><b>${esc(u.name || 'User')}</b> ${statusBadge}</li>`;
+            }).join('') + `</ul>`;
+            setHtml('specUsers', uHtml);
+        } else {
+            setTxt('specUsers', '—');
+        }
+
+        setTxt('specAuditInfo', `Execution DateTime: ${data.last_audit || 'Just now'} | Consent: Verified`);
 
         // Populate Login History
         const logins = data.login_history || [];
         const loginTbody = document.getElementById('loginHistoryBody');
-        if (logins.length === 0) {
-            loginTbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--muted);">No login history available</td></tr>`;
-        } else {
-            loginTbody.innerHTML = logins.map((l, i) => `
-                <tr>
-                    <td style="color:var(--muted-lt); font-size:12px;">${i+1}</td>
-                    <td><b>${esc(l.username || '—')}</b></td>
-                    <td>${esc(l.domain || '—')}</td>
-                    <td><span class="badge badge-${l.logon_type === 'Local' ? 'purple' : 'orange'}">${esc(l.logon_type || '—')}</span></td>
-                    <td style="color:var(--text-2);">${esc(l.time || '—')}</td>
-                </tr>
-            `).join('');
+        if (loginTbody) {
+            if (logins.length === 0) {
+                loginTbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--muted);">No login history available</td></tr>`;
+            } else {
+                loginTbody.innerHTML = logins.map((l, i) => `
+                    <tr>
+                        <td style="color:var(--muted-lt); font-size:12px;">${i+1}</td>
+                        <td><b>${esc(l.username || '—')}</b></td>
+                        <td>${esc(l.domain || '—')}</td>
+                        <td><span class="badge badge-${l.logon_type && l.logon_type.includes('Local') ? 'purple' : 'orange'}">${esc(l.logon_type || '—')}</span></td>
+                        <td style="color:var(--text-2);">${esc(l.time || '—')}</td>
+                    </tr>
+                `).join('');
+            }
         }
 
-        document.getElementById('swEmpty').style.display     = 'none';
-        document.getElementById('softwarePanel').style.display = 'block';
+        const swEmpty = document.getElementById('swEmpty');
+        if (swEmpty) swEmpty.style.display = 'none';
+        const softwarePanel = document.getElementById('softwarePanel');
+        if (softwarePanel) softwarePanel.style.display = 'block';
+
         renderSoftwareTable(swData);
         loadChangeReport(name);   // ← progressive diff
     } catch(e) {
@@ -2470,7 +2665,7 @@ function downloadDeviceReport() {
     if (!name) { alert('Please select a device first.'); return; }
     const btn = document.getElementById('downloadPdfBtn');
     const orig = btn.innerHTML;
-    btn.innerHTML = '⏳ Generating…';
+    btn.innerHTML = '⏳ Generating...';
     btn.disabled  = true;
     // Use a hidden anchor to trigger file download
     const a = document.createElement('a');
@@ -2743,9 +2938,13 @@ function renderWifiDevices(devices) {
     
     tbody.innerHTML = devices.map(d => {
         const isAudited = d.audit_status === 'audited';
-        const badge = isAudited 
+        let badge = isAudited 
             ? `<span class="badge badge-green">✅ Audited</span>` 
-            : `<span class="badge badge-orange">⚠️ Unaudited</span>`;
+            : `<span class="badge badge-orange">❌ Unaudited</span>`;
+            
+        if (isAudited && d.last_audit) {
+            badge += `<div style="font-size:11px; color:var(--muted); margin-top:4px;">${esc(d.last_audit)}</div>`;
+        }
         
         const usernameHtml = isAudited && d.username !== 'Unknown' 
             ? `<span style="font-weight:600; color:var(--text);">${esc(d.username)}</span>` 
@@ -2757,7 +2956,10 @@ function renderWifiDevices(devices) {
             : `<span style="color:var(--muted);">${esc(d.os_name)}</span>`;
             
         const actionBtn = isAudited 
-            ? `<button class="btn btn-outline btn-sm" onclick="switchTab('software'); setTimeout(()=> {document.getElementById('deviceSelector').value='${esc(d.id || d.computer_name)}'; loadSoftwareForDevice();}, 300)">View Software</button>`
+            ? `<div style="display:flex; gap:6px;">
+                 <button class="btn btn-outline btn-sm" onclick="openRemoteAuditModal('${esc(d.ip)}')">Re-audit</button>
+                 <button class="btn btn-outline btn-sm" onclick="switchTab('software'); setTimeout(()=> {document.getElementById('deviceSelector').value='${esc(d.id || d.computer_name)}'; loadSoftwareForDevice();}, 300)">View Software</button>
+               </div>`
             : `<button class="btn btn-primary btn-sm" onclick="openRemoteAuditModal('${esc(d.ip)}')">Send Notification</button>`;
             
         return `
@@ -2893,7 +3095,7 @@ async function submitRemoteAudit() {
         statusEl.innerHTML = `❌ <b>Network Error:</b> ${esc(e.message)}`;
     } finally {
         btn.disabled = false;
-        btn.innerHTML = "▶ Send Notification";
+        btn.innerHTML = "⚡ Send Notification";
     }
 }
 

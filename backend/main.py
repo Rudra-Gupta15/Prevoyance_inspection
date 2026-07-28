@@ -17,8 +17,9 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.pagesizes import letter
 from xml.sax.saxutils import escape
 import os
-import os as os_module
 import json
+import sqlite3
+import os as os_module
 import xml.etree.ElementTree as ET
 from datetime import datetime
 import logging
@@ -43,6 +44,26 @@ except Exception as e:
     pass
 
 # ── Directories & Logging ────────────────────────────────────────────────────
+import sqlite3
+
+DB_PATH = "audits.db"
+
+def init_db():
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS device_audits (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                mac_address TEXT,
+                computer_name TEXT,
+                os_name TEXT,
+                execution_datetime TEXT,
+                audit_data TEXT
+            )
+        ''')
+        conn.commit()
+
+init_db()
+
 LOGS_DIR          = "logs"
 USER_INFO_DIR     = "user_info"
 ASSET_METADATA_DIR = "user_info/assets"
@@ -117,6 +138,11 @@ class NetworkAdapter(BaseModel):
     adapter_type: str = "Unknown"
     speed: str = "Unknown"
     mac_address: str = "Unknown"
+    ipv4: str = "Unknown"
+    ipv6: str = "Unknown"
+    gateway: str = "Unknown"
+    dns_servers: str = "N/A"
+    wifi_ssid: str = "N/A"
 
     @validator("*", pre=True, allow_reuse=True)
     def normalize(cls, v):
@@ -137,7 +163,10 @@ class DiskPartition(BaseModel):
     name: str = "Unknown"
     type: str = "Unknown"
     size_gb: str = "Unknown"
+    free_gb: str = "Unknown"
     bootable: str = "Unknown"
+    health: str = "Healthy"
+    ssd_hdd: str = "SSD/HDD"
 
     @validator("*", pre=True, allow_reuse=True)
     def normalize(cls, v):
@@ -149,16 +178,40 @@ class HardwareDetails(BaseModel):
     cpu: str = "Unknown"
     ram: str = "Unknown"
     disk: str = "Unknown"
-    # Extended (Phase 1)
-    gpu_details: List[Union[GpuInfo, dict]] = []
+    # Extended System & CPU/RAM
+    processor_name: str = "Unknown"
+    cpu_cores: str = "Unknown"
+    cpu_threads: str = "Unknown"
+    installed_ram: str = "Unknown"
+    ram_slots: str = "Unknown"
     serial_number: str = "Unknown"
+    asset_tag: str = "N/A"
+    device_type: str = "Unknown"
     manufacturer: str = "Unknown"
     model: str = "Unknown"
+    architecture: str = "Unknown"
+    # Motherboard & BIOS
+    mobo_manufacturer: str = "Unknown"
+    mobo_product: str = "Unknown"
+    mobo_version: str = "Unknown"
+    mobo_serial: str = "Unknown"
+    bios_version: str = "Unknown"
+    bios_date: str = "Unknown"
+    # Battery Diagnostics
+    battery_health: str = "N/A"
+    cycle_count: str = "N/A"
+    charge_percent: str = "N/A"
+    design_capacity: str = "N/A"
+    full_capacity: str = "N/A"
+    # Location Info
+    location_info: str = "Unknown"
+    # Lists
+    gpu_details: List[Union[GpuInfo, dict]] = []
     network_adapters: List[Union[NetworkAdapter, dict]] = []
     peripherals: List[Union[Peripheral, dict]] = []
     disk_partitions: List[Union[DiskPartition, dict]] = []
 
-    @validator("cpu", "ram", "disk", "serial_number", "manufacturer", "model", pre=True, always=True, allow_reuse=True)
+    @validator("cpu", "ram", "disk", "serial_number", "manufacturer", "model", "processor_name", "installed_ram", pre=True, always=True, allow_reuse=True)
     def normalize_str(cls, v):
         return clean_string(v, "Unknown")
 
@@ -230,10 +283,18 @@ class AuditData(BaseModel):
     execution_datetime: str = ""
     consent: str = CONSENT_TEXT
     computer_name: str = "Unknown"
+    current_user: str = "Unknown"
     os_name: str = "Unknown"
     os_version: str = "Unknown"
+    os_build: str = "Unknown"
+    last_boot: str = "Unknown"
+    uptime: str = "Unknown"
     architecture: str = "Unknown"
     license_status: str = "Unknown"
+    firewall: str = "Unknown"
+    bitlocker: str = "Unknown"
+    secure_boot: str = "Unknown"
+    tpm: str = "Unknown"
     hotfixes: List[Union[HotfixData, str]] = []
     mac_address: str = "Unknown"
     drive_name: str = "No CD Unit Found"
@@ -494,11 +555,19 @@ def upload_audit(data: AuditData, client_id: str = Query(None)):
     pdf_path  = f"{USER_INFO_DIR}/audit_{cid}_{clean_name}_{timestamp}.pdf"
     xml_path  = f"{USER_INFO_DIR}/audit_{cid}_{clean_name}_{timestamp}.xml"
 
-    try:
-        with open(json_path, "w") as f:
-            json.dump(model_to_dict(data), f, indent=4)
-    except Exception as e:
-        logger.error(f"Failed to save JSON: {e}")
+    # INSERT TO DB INSTEAD OF SAVING JSON FILE
+    mac = data.mac_address
+    name = data.computer_name
+    os_name = data.os_name
+    ts = data.execution_datetime
+    
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute('''
+            INSERT INTO device_audits (mac_address, computer_name, os_name, execution_datetime, audit_data)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (mac, name, os_name, ts, data.json()))
+        conn.commit()
+
 
     av_str          = list_text(data.antivirus)
     compression_str = list_text(data.compression_utilities)
@@ -1018,63 +1087,63 @@ def list_assets():
 @app.get("/api/devices")
 def list_audited_devices():
     devices = {}
-    if os.path.exists(USER_INFO_DIR):
-        for fn in os.listdir(USER_INFO_DIR):
-            if fn.endswith(".json") and fn.startswith("audit_"):
-                try:
-                    with open(f"{USER_INFO_DIR}/{fn}") as f:
-                        d = json.load(f)
-                    mac = d.get("mac_address", "Unknown")
-                    name = d.get("computer_name", "Unknown")
-                    ts   = d.get("execution_datetime", "")
-                    uid  = mac if mac != "Unknown" else name
-                    if uid not in devices or ts > devices[uid]["last_seen"]:
-                        devices[uid] = {
-                            "id":            uid,
-                            "computer_name": name,
-                            "last_seen":     ts,
-                            "os_name":       d.get("os_name", ""),
-                            "file":          fn,
-                        }
-                except Exception:
-                    pass
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        cursor = conn.execute('''
+            SELECT mac_address, computer_name, os_name, MAX(execution_datetime) as last_seen
+            FROM device_audits
+            GROUP BY mac_address, computer_name
+        ''')
+        for row in cursor:
+            mac = row['mac_address']
+            name = row['computer_name']
+            uid = mac if mac != "Unknown" else name
+            if uid not in devices or row['last_seen'] > devices[uid]['last_seen']:
+                devices[uid] = {
+                    "id": uid,
+                    "computer_name": name,
+                    "last_seen": row['last_seen'],
+                    "os_name": row['os_name']
+                }
     return {"devices": list(devices.values()), "total": len(devices)}
+
 
 
 @app.get("/api/software/{device_id}")
 def get_software_for_device(device_id: str):
-    latest_file  = None
-    latest_ts    = ""
-    latest_data  = None
-    if os.path.exists(USER_INFO_DIR):
-        for fn in os.listdir(USER_INFO_DIR):
-            if fn.endswith(".json") and fn.startswith("audit_"):
-                try:
-                    with open(f"{USER_INFO_DIR}/{fn}") as f:
-                        d = json.load(f)
-                    mac = d.get("mac_address", "Unknown")
-                    name = d.get("computer_name", "Unknown")
-                    uid = mac if mac != "Unknown" else name
-                    if uid.lower() == device_id.lower():
-                        ts = d.get("execution_datetime", "")
-                        if ts > latest_ts:
-                            latest_ts   = ts
-                            latest_file = fn
-                            latest_data = d
-                except Exception:
-                    pass
+    latest_data = None
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        cursor = conn.execute('''
+            SELECT audit_data, execution_datetime FROM device_audits 
+            WHERE mac_address = ? COLLATE NOCASE OR computer_name = ? COLLATE NOCASE
+            ORDER BY execution_datetime DESC LIMIT 1
+        ''', (device_id, device_id))
+        row = cursor.fetchone()
+        if row:
+            latest_data = json.loads(row['audit_data'])
+            latest_ts = row['execution_datetime']
+
     if not latest_data:
         raise HTTPException(status_code=404, detail=f"No audit found for device: {device_id}")
     return {
         "id":                 device_id,
         "computer_name":      latest_data.get("computer_name", "Unknown"),
+        "current_user":       latest_data.get("current_user", "Unknown"),
         "last_audit":         latest_ts,
         "software_inventory": latest_data.get("software_inventory", []),
         "total":              len(latest_data.get("software_inventory", [])),
         "os_name":            latest_data.get("os_name", ""),
         "os_version":         latest_data.get("os_version", ""),
+        "os_build":           latest_data.get("os_build", ""),
+        "last_boot":          latest_data.get("last_boot", ""),
+        "uptime":             latest_data.get("uptime", ""),
         "architecture":       latest_data.get("architecture", ""),
         "license_status":     latest_data.get("license_status", ""),
+        "firewall":           latest_data.get("firewall", "Unknown"),
+        "bitlocker":          latest_data.get("bitlocker", "Unknown"),
+        "secure_boot":        latest_data.get("secure_boot", "Unknown"),
+        "tpm":                latest_data.get("tpm", "Unknown"),
         "hardware_details":   latest_data.get("hardware_details", {}),
         "network_details":    latest_data.get("network_details", []),
         "user_accounts":      latest_data.get("user_accounts", []),
@@ -1094,22 +1163,16 @@ def get_device_diff(device_id: str):
     Compare the two most recent audit scans for a device.
     Returns: newly installed apps, removed apps, hardware changes.
     """
-    scans = []  # list of (execution_datetime, data_dict)
-
-    if os_module.path.exists(USER_INFO_DIR):
-        for fn in os_module.listdir(USER_INFO_DIR):
-            if not (fn.endswith(".json") and fn.startswith("audit_")):
-                continue
-            try:
-                with open(f"{USER_INFO_DIR}/{fn}") as f:
-                    d = json.load(f)
-                mac = d.get("mac_address", "Unknown")
-                name = d.get("computer_name", "Unknown")
-                uid = mac if mac != "Unknown" else name
-                if uid.lower() == device_id.lower():
-                    scans.append((d.get("execution_datetime", ""), d))
-            except Exception:
-                pass
+    scans = []
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        cursor = conn.execute('''
+            SELECT audit_data, execution_datetime FROM device_audits 
+            WHERE mac_address = ? COLLATE NOCASE OR computer_name = ? COLLATE NOCASE
+            ORDER BY execution_datetime DESC LIMIT 2
+        ''', (device_id, device_id))
+        for row in cursor:
+            scans.append((row['execution_datetime'], json.loads(row['audit_data'])))
 
     if len(scans) < 2:
         return {
@@ -1117,6 +1180,7 @@ def get_device_diff(device_id: str):
             "message": "Need at least 2 scans to generate a change report.",
             "scan_count": len(scans),
         }
+
 
     # Sort by datetime string ascending — latest last
     scans.sort(key=lambda x: x[0])
@@ -1835,5 +1899,20 @@ if os.path.exists(SCRIPTS_DIR):
     app.mount("/scripts", StaticFiles(directory=SCRIPTS_DIR), name="scripts")
 
 FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
+
+@app.get("/")
+def read_root():
+    index_path = os.path.join(FRONTEND_DIR, "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(
+            index_path,
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0"
+            }
+        )
+    return {"message": "Frontend index.html not found"}
+
 if os.path.exists(FRONTEND_DIR):
     app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")

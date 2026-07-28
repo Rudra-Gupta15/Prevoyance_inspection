@@ -1,421 +1,495 @@
 # ==============================================================================
-#          NSDL WORKSTATION COMPLIANCE AUDIT SCRIPT (Windows)
+#         NSDL WORKSTATION COMPLIANCE AUDIT SCRIPT (WINDOWS)
 # ==============================================================================
-# Version: 3.0.0 — Full IT Asset Management Edition
 
-Write-Host "Collecting Workstation Compliance Data..." -ForegroundColor Green
+$ErrorActionPreference = "SilentlyContinue"
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-function Get-SafeString {
-    param(
-        [Parameter(Mandatory = $false)] $Value,
-        [string] $Fallback = "Unknown"
-    )
-    if ($null -eq $Value) { return $Fallback }
-    if ($Value -is [array]) {
-        $joined = ($Value | ForEach-Object { [string]$_ }) -join ", "
-        if ([string]::IsNullOrWhiteSpace($joined)) { return $Fallback }
-        return $joined
-    }
-    $text = [string]$Value
-    if ([string]::IsNullOrWhiteSpace($text)) { return $Fallback }
-    return $text
+function Get-SafeString ($val, $fallback="Unknown") {
+    if ([string]::IsNullOrWhiteSpace($val)) { return $fallback }
+    return $val.ToString().Trim()
 }
 
-$executionDateTime = Get-Date -Format "dd-MMM-yyyy_HH:mm:ss"
+$executionDateTime = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
 $consentText = "We provide approval to NSDL e-Governance Infrastructure Ltd.(NSDL e-Gov) to capture the details regarding the System details and share the details with NSDL e-Gov."
 
-# 1. Computer Name
-$computer = Get-SafeString $env:COMPUTERNAME "Unknown"
+Write-Host "Collecting Workstation Compliance Data..." -ForegroundColor Cyan
 
-# 2. OS Details
-$osName      = "Unknown"
-$osVersion   = "Unknown"
-$architecture = "Unknown"
+# ---------------------------------------------------------
+# OS & Security
+# ---------------------------------------------------------
+$os = Get-CimInstance Win32_OperatingSystem
+$osName = Get-SafeString $os.Caption
+$osVersion = Get-SafeString $os.Version
+$osBuild = Get-SafeString $os.BuildNumber
+$architecture = Get-SafeString $os.OSArchitecture
+
+$lastBoot = "Unknown"
+$uptime = "Unknown"
 try {
-    $os = Get-CimInstance Win32_OperatingSystem -ErrorAction Stop
-    $osName       = Get-SafeString $os.Caption "Unknown"
-    $osVersion    = Get-SafeString $os.Version "Unknown"
-    $architecture = Get-SafeString $os.OSArchitecture "Unknown"
+    $lastBoot = $os.LastBootUpTime.ToString("yyyy-MM-dd HH:mm:ss")
+    $ts = (Get-Date) - $os.LastBootUpTime
+    $uptime = "{0} Days, {1} Hours, {2} Mins" -f $ts.Days, $ts.Hours, $ts.Minutes
 } catch {}
 
-# 3. License Status Check
+$computer = $env:COMPUTERNAME
+$currentUser = Get-SafeString $env:USERNAME "Unknown"
+
 $licenseStatus = "Unknown"
 try {
-    $sls = Get-CimInstance SoftwareLicensingProduct -ErrorAction Stop |
-        Where-Object { $_.PartialProductKey -and $_.ApplicationID -eq "55c92734-d682-4d71-983e-d6ec3f16059f" } |
-        Select-Object -First 1
-    if ($sls) {
-        $statusMap = @{
-            0 = "Unlicensed"; 1 = "Licensed"; 2 = "OOBGrace"
-            3 = "OOTGrace"; 4 = "NonGenuineGrace"; 5 = "Notification"; 6 = "ExtendedGrace"
-        }
-        $licenseStatus = Get-SafeString $statusMap[[int]$sls.LicenseStatus] "Unknown"
-    }
-} catch {
-    $licenseStatus = "Licensed (WMI Bypass)"
-}
-
-# 4. Windows Update / Hotfix Details
-$hotfixes = @()
-try {
-    $hfObjects = Get-HotFix -ErrorAction Stop
-    foreach ($hf in $hfObjects) {
-        $installedOn = ""
-        if ($hf.InstalledOn) { $installedOn = $hf.InstalledOn.ToString("M/d/yyyy") }
-        $hotfixes += @{
-            caption      = Get-SafeString $hf.Caption ""
-            cs_name      = Get-SafeString $hf.CSName $computer
-            description  = Get-SafeString $hf.Description ""
-            fix_id       = Get-SafeString $hf.HotFixID ""
-            installed_on = Get-SafeString $installedOn ""
-        }
-    }
+    $slmgr = cscript.exe /nologo $env:windir\system32\slmgr.vbs /dli
+    if ($slmgr -match "License Status: Licensed") { $licenseStatus = "Licensed" }
+    elseif ($slmgr -match "License Status: ") { $licenseStatus = "Not Licensed / Unknown" }
 } catch {}
 
-# 5. MAC Address (Primary)
-$mac = "Unknown"
-try {
-    $macValue = Get-NetAdapter -ErrorAction Stop |
-        Where-Object { $_.Status -eq "Up" } |
-        Select-Object -First 1 -ExpandProperty MacAddress
-    $mac = (Get-SafeString $macValue "Unknown" -replace '[:-]', '').ToUpper()
-} catch {}
-
-# 6. CDROM / DVD Drive Check
-$driveName = "No CD Unit Found"
-try {
-    $cdrom = Get-CimInstance Win32_CDROMDrive -ErrorAction Stop
-    if ($cdrom) {
-        $driveNames = @($cdrom | ForEach-Object { $_.Name } | Where-Object { $_ })
-        $driveName = Get-SafeString $driveNames "No CD Unit Found"
-    }
-} catch {}
-
-# 7. Compression Utility Details
-$compressionUtilities = @()
-try {
-    $registryPaths = @(
-        "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*",
-        "HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*",
-        "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*"
-    )
-    $compressionUtilities = Get-ItemProperty $registryPaths -ErrorAction SilentlyContinue |
-        Where-Object { $_.DisplayName -match "7-Zip|WinRAR|WinZip|PeaZip|Bandizip|Zipware|PowerArchiver" } |
-        Select-Object -ExpandProperty DisplayName -Unique
-} catch {}
-if ($compressionUtilities.Count -eq 0) {
-    $compressionUtilities = @("No compression utility found")
-}
-
-# 8. Antivirus Products
+# Antivirus
 $antivirus = @()
 try {
-    $avProducts = Get-CimInstance -Namespace root/SecurityCenter2 -ClassName AntivirusProduct -ErrorAction Stop
-    foreach ($av in $avProducts) {
-        if ($av.displayName) { $antivirus += $av.displayName }
-    }
+    $avItems = Get-CimInstance -Namespace "root\SecurityCenter2" -Class AntiVirusProduct
+    foreach ($av in $avItems) { $antivirus += $av.displayName }
 } catch {}
-if ($antivirus.Count -eq 0) { $antivirus = @("Windows Defender") }
+if ($antivirus.Count -eq 0) { $antivirus += "Windows Defender" }
 
-# 9. Connected Printer Details
-$printers = @()
+# Firewall
+$firewall = "Unknown"
 try {
-    $printerObjects = Get-CimInstance Win32_Printer -ErrorAction Stop | Where-Object {
-        $_.Name -notmatch "Microsoft Print to PDF|Microsoft XPS Document Writer|OneNote|Fax|Root Print|Send to Microsoft|AnyDesk" -and
-        $_.PortName -notmatch "PORTPROMPT:|SHRFAX:|nul:"
-    }
-    foreach ($p in $printerObjects) {
-        $printers += @{
-            name                    = Get-SafeString $p.Name "Unknown"
-            system_name             = Get-SafeString $p.SystemName $computer
-            enable_bidi             = Get-SafeString $p.EnableBIDI "False"
-            extended_printer_status = Get-SafeString $p.ExtendedPrinterStatus "0"
-            port_name               = Get-SafeString $p.PortName "Unknown"
-        }
-    }
+    $fw = Get-NetFirewallProfile -Profile Domain,Public,Private | Where-Object Enabled -eq $true
+    $firewall = if ($fw) { "Enabled" } else { "Disabled" }
 } catch {}
 
-# 10. Hardware Basics — CPU, RAM, Logical Disk
-$cpuName = "Unknown"
-$ramTotal = "Unknown"
-$diskBasic = "Unknown"
+# BitLocker
+$bitlocker = "Unknown"
 try {
-    $cpu = Get-CimInstance Win32_Processor -ErrorAction SilentlyContinue | Select-Object -First 1
-    if ($cpu) { $cpuName = Get-SafeString $cpu.Name "Unknown" }
-
-    $ram = Get-CimInstance Win32_PhysicalMemory -ErrorAction SilentlyContinue
-    if ($ram) {
-        $totalRam = ($ram | Measure-Object -Property Capacity -Sum).Sum
-        $ramTotal = [math]::Round($totalRam / 1GB, 2).ToString() + " GB"
+    $bl = Get-BitLockerVolume -MountPoint "C:" -ErrorAction SilentlyContinue
+    if ($bl -and $bl.VolumeStatus) {
+        $bitlocker = $bl.VolumeStatus.ToString()
+    } else {
+        $bitlocker = "Not Encrypted"
     }
+} catch {
+    $bitlocker = "Not Supported/Unknown"
+}
 
-    $disks = Get-CimInstance Win32_LogicalDisk -Filter "DriveType=3" -ErrorAction SilentlyContinue
-    if ($disks) {
-        $diskStrings = @()
-        foreach ($d in $disks) {
-            if ($d.Size -gt 0) {
-                $free = [math]::Round($d.FreeSpace / 1GB, 2)
-                $size = [math]::Round($d.Size / 1GB, 2)
-                $diskStrings += "$($d.DeviceID) $free GB free of $size GB"
-            }
-        }
-        if ($diskStrings.Count -gt 0) { $diskBasic = $diskStrings -join "; " }
-    }
-} catch {}
-
-# 11. Network Details (IP / Gateway)
-$networkDetails = @()
+# Secure Boot
+$secureBoot = "Unknown"
 try {
-    $nics = Get-CimInstance Win32_NetworkAdapterConfiguration -Filter "IPEnabled=True" -ErrorAction SilentlyContinue
-    foreach ($nic in $nics) {
-        $networkDetails += @{
-            ip_address = if ($nic.IPAddress) { $nic.IPAddress -join ", " } else { "Unknown" }
-            gateway    = if ($nic.DefaultIPGateway) { $nic.DefaultIPGateway -join ", " } else { "Unknown" }
-            mac        = if ($nic.MACAddress) { $nic.MACAddress } else { "Unknown" }
-        }
-    }
-} catch {}
+    $sb = Confirm-SecureBootUEFI -ErrorAction SilentlyContinue
+    $secureBoot = if ($sb) { "Enabled" } else { "Disabled" }
+} catch {
+    $secureBoot = "Unsupported"
+}
 
-# 12. Local User Accounts
-$userAccounts = @()
+# TPM
+$tpm = "Unknown"
 try {
-    $users = Get-CimInstance Win32_UserAccount -Filter "LocalAccount=True" -ErrorAction SilentlyContinue
-    foreach ($u in $users) {
-        $userAccounts += @{
-            name     = if ($u.Name) { $u.Name } else { "Unknown" }
-            disabled = if ($u.Disabled) { "True" } else { "False" }
-        }
+    $tpmObj = Get-Tpm -ErrorAction SilentlyContinue
+    if ($tpmObj) {
+        $tpm = if ($tpmObj.TpmPresent) { "Present, Enabled: " + $tpmObj.TpmReady } else { "Not Present" }
+    } else {
+        $tpm = "Not Present"
     }
-} catch {}
+} catch {
+    $tpm = "Unsupported"
+}
 
-# ────────────────────────────────────────────────────────────────────────────
-#  PHASE 1 — EXTENDED HARDWARE COLLECTION
-# ────────────────────────────────────────────────────────────────────────────
-
-# 13. GPU Details
+# ---------------------------------------------------------
+# GPU Information
+# ---------------------------------------------------------
 Write-Host "Collecting GPU information..." -ForegroundColor Cyan
 $gpuDetails = @()
 try {
-    $gpus = Get-CimInstance Win32_VideoController -ErrorAction SilentlyContinue
-    foreach ($gpu in $gpus) {
-        $vramMB = "Unknown"
-        if ($gpu.AdapterRAM -and $gpu.AdapterRAM -gt 0) {
-            $vramMB = [math]::Round($gpu.AdapterRAM / 1MB, 0).ToString() + " MB"
-        }
+    $gpus = Get-CimInstance Win32_VideoController
+    foreach ($g in $gpus) {
+        $vram = "Unknown"
+        if ($g.AdapterRAM -gt 0) { $vram = "{0:N2} GB" -f ($g.AdapterRAM / 1GB) }
         $gpuDetails += @{
-            name           = Get-SafeString $gpu.Name "Unknown"
-            driver_version = Get-SafeString $gpu.DriverVersion "Unknown"
-            vram           = $vramMB
+            name           = Get-SafeString $g.Name
+            driver_version = Get-SafeString $g.DriverVersion
+            vram           = $vram
         }
     }
 } catch {}
 
-# 14. Serial Number, Manufacturer & Model
+# ---------------------------------------------------------
+# Device Identity & Motherboard
+# ---------------------------------------------------------
 Write-Host "Collecting device identity..." -ForegroundColor Cyan
-$serialNumber = "Unknown"
-$manufacturer  = "Unknown"
-$model         = "Unknown"
-try {
-    $bios = Get-CimInstance Win32_BIOS -ErrorAction SilentlyContinue | Select-Object -First 1
-    if ($bios) { $serialNumber = Get-SafeString $bios.SerialNumber "Unknown" }
+$cs = Get-CimInstance Win32_ComputerSystem
+$manufacturer = Get-SafeString $cs.Manufacturer
+$model = Get-SafeString $cs.Model
 
-    $cs = Get-CimInstance Win32_ComputerSystem -ErrorAction SilentlyContinue | Select-Object -First 1
-    if ($cs) {
-        $manufacturer = Get-SafeString $cs.Manufacturer "Unknown"
-        $model        = Get-SafeString $cs.Model "Unknown"
-    }
+$bios = Get-CimInstance Win32_BIOS
+$serialNumber = Get-SafeString $bios.SerialNumber
+$biosVersion = Get-SafeString $bios.SMBIOSBIOSVersion
+$biosDate = "Unknown"
+try { $biosDate = $bios.ReleaseDate.ToString("yyyy-MM-dd") } catch {}
+
+$enclosure = Get-CimInstance Win32_SystemEnclosure
+$assetTag = Get-SafeString $enclosure.SMBIOSAssetTag
+if ($assetTag -eq "" -or $assetTag -eq "No Asset Information") { $assetTag = "N/A" }
+$deviceType = "Desktop"
+try {
+    $typeId = $enclosure.ChassisTypes[0]
+    if ($typeId -in 8,9,10,11,12,14,18,21) { $deviceType = "Laptop" }
+    elseif ($typeId -in 3,4,5,6,7,15,16) { $deviceType = "Desktop" }
+    elseif ($typeId -eq 23) { $deviceType = "Rack Mount Chassis" }
 } catch {}
 
-# 15. Physical Network Adapters (Detailed)
+$mobo = Get-CimInstance Win32_BaseBoard
+$moboManufacturer = Get-SafeString $mobo.Manufacturer
+$moboProduct = Get-SafeString $mobo.Product
+$moboVersion = Get-SafeString $mobo.Version
+$moboSerial = Get-SafeString $mobo.SerialNumber
+
+# ---------------------------------------------------------
+# Hardware (CPU & RAM)
+# ---------------------------------------------------------
+$cpuObj = Get-CimInstance Win32_Processor | Select-Object -First 1
+$processorName = Get-SafeString $cpuObj.Name
+$cpuCores = Get-SafeString $cpuObj.NumberOfCores
+$cpuThreads = Get-SafeString $cpuObj.NumberOfLogicalProcessors
+
+$ramTotalStr = "{0:N2} GB" -f ($cs.TotalPhysicalMemory / 1GB)
+$ramSlots = "Unknown"
+try {
+    $usedSticks = (Get-CimInstance Win32_PhysicalMemory).Count
+    $memSlotsArray = Get-CimInstance Win32_PhysicalMemoryArray
+    if ($memSlotsArray.MemoryDevices) {
+        $totalSlots = $memSlotsArray.MemoryDevices
+        $ramSlots = "$usedSticks of $totalSlots slots used"
+    } else {
+        $ramSlots = "$usedSticks slot(s) used"
+    }
+} catch {
+    $ramSlots = "Unknown"
+}
+
+# ---------------------------------------------------------
+# Network Adapter Details
+# ---------------------------------------------------------
 Write-Host "Collecting network adapter details..." -ForegroundColor Cyan
 $networkAdapters = @()
+$mac = "Unknown"
+
+$dnsServers = "Unknown"
 try {
-    $adapters = Get-CimInstance Win32_NetworkAdapter -ErrorAction SilentlyContinue |
-        Where-Object { $_.PhysicalAdapter -eq $true }
-    foreach ($a in $adapters) {
-        $speedMbps = "Unknown"
-        if ($a.Speed -and $a.Speed -gt 0) {
-            $speedMbps = [math]::Round($a.Speed / 1000000, 0).ToString() + " Mbps"
+    $dnsServers = (Get-DnsClientServerAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue | Where-Object ServerAddresses).ServerAddresses -join ", "
+    if (-not $dnsServers) { $dnsServers = "N/A" }
+} catch { $dnsServers = "N/A" }
+
+$connectionSpeed = "Unknown"
+try {
+    $connectionSpeed = (Get-NetAdapter -ErrorAction SilentlyContinue | Where-Object Status -eq 'Up').LinkSpeed -join ", "
+    if (-not $connectionSpeed) { $connectionSpeed = "Active" }
+} catch { $connectionSpeed = "Active" }
+
+$wifiSsid = "N/A"
+try {
+    $out = netsh wlan show interfaces
+    foreach ($line in $out) {
+        if ($line -match '^\s*SSID\s*:\s*(.+)') {
+            $candidate = $matches[1].Trim()
+            if ($candidate -and $line -notmatch 'BSSID') { $wifiSsid = $candidate; break }
         }
+    }
+} catch { $wifiSsid = "N/A" }
+
+try {
+    $adapters = Get-CimInstance Win32_NetworkAdapterConfiguration | Where-Object { $_.IPEnabled -eq $true }
+    foreach ($a in $adapters) {
+        if ($mac -eq "Unknown" -and $a.MACAddress) { $mac = $a.MACAddress }
+        $ip4 = ($a.IPAddress | Where-Object { $_ -match "\." }) -join ", "
+        $ip6 = ($a.IPAddress | Where-Object { $_ -match ":" }) -join ", "
+        $gw = ($a.DefaultIPGateway) -join ", "
         $networkAdapters += @{
-            name         = Get-SafeString $a.Name "Unknown"
-            adapter_type = Get-SafeString $a.AdapterType "Unknown"
-            speed        = $speedMbps
-            mac_address  = Get-SafeString $a.MACAddress "Unknown"
+            name             = Get-SafeString $a.Description
+            adapter_type     = "Ethernet / Wi-Fi"
+            speed            = Get-SafeString $connectionSpeed
+            mac_address      = Get-SafeString $a.MACAddress
+            ipv4             = Get-SafeString $ip4
+            ipv6             = Get-SafeString $ip6
+            gateway          = Get-SafeString $gw
+            dns_servers      = Get-SafeString $dnsServers
+            wifi_ssid        = Get-SafeString $wifiSsid
         }
     }
 } catch {}
 
-# 16. USB & Connected Peripherals
+# ---------------------------------------------------------
+# Geolocation & Public IP Info
+# ---------------------------------------------------------
+Write-Host "Collecting location & network IP info..." -ForegroundColor Cyan
+$locationInfo = "Unknown"
+try {
+    $geo = Invoke-RestMethod -Uri "http://ip-api.com/json/" -TimeoutSec 5 -ErrorAction SilentlyContinue
+    if ($geo -and $geo.status -eq "success") {
+        $locationInfo = "$($geo.city), $($geo.regionName), $($geo.country) (Lat: $($geo.lat), Lon: $($geo.lon) | Public IP: $($geo.query))"
+    }
+} catch {
+    $locationInfo = "Location Unavailable"
+}
+
+# ---------------------------------------------------------
+# Peripheral Devices
+# ---------------------------------------------------------
 Write-Host "Collecting peripheral devices..." -ForegroundColor Cyan
 $peripherals = @()
 try {
-    $validClasses = @("HIDClass", "USB", "Printer", "Scanner", "Keyboard", "Mouse", "Image", "Bluetooth")
-    $usbDevices = Get-CimInstance Win32_PnPEntity -ErrorAction SilentlyContinue |
-        Where-Object { $_.PNPClass -in $validClasses -and $_.Status -eq "OK" }
-    foreach ($dev in $usbDevices) {
+    $pnps = Get-CimInstance Win32_PnPEntity | Where-Object { $_.Status -eq 'OK' -and ($_.PNPClass -in 'Keyboard','Mouse','Monitor','USB') } | Select-Object -First 10
+    foreach ($p in $pnps) {
         $peripherals += @{
-            name   = Get-SafeString $dev.Name "Unknown"
-            type   = Get-SafeString $dev.PNPClass "Unknown"
-            status = Get-SafeString $dev.Status "Unknown"
+            name   = Get-SafeString $p.Caption
+            type   = Get-SafeString $p.PNPClass
+            status = "Connected"
         }
     }
 } catch {}
 
-# 17. Disk Partitions (Detailed)
+# ---------------------------------------------------------
+# Disk Partitions & Physical Disks
+# ---------------------------------------------------------
 Write-Host "Collecting disk partition details..." -ForegroundColor Cyan
 $diskPartitions = @()
+$diskSummaryLines = @()
+
 try {
-    $partitions = Get-CimInstance Win32_DiskPartition -ErrorAction SilentlyContinue
-    foreach ($p in $partitions) {
-        $sizeGB = [math]::Round($p.Size / 1GB, 2)
+    $logicalDisks = Get-CimInstance Win32_LogicalDisk -Filter "DriveType=3"
+    foreach ($ld in $logicalDisks) {
+        $sizeGb = "{0:N2} GB" -f ($ld.Size / 1GB)
+        $freeGb = "{0:N2} GB" -f ($ld.FreeSpace / 1GB)
+        
+        $mediaType = "SSD/HDD"
+        $health = "Healthy"
+
+        $diskSummaryLines += "$($ld.DeviceID) ($sizeGb total, $freeGb free) [$mediaType]"
+
         $diskPartitions += @{
-            name     = Get-SafeString $p.Name "Unknown"
-            type     = Get-SafeString $p.Type "Unknown"
-            size_gb  = $sizeGB.ToString() + " GB"
-            bootable = if ($p.Bootable) { "Yes" } else { "No" }
+            name       = $ld.DeviceID
+            type       = Get-SafeString $ld.FileSystem
+            size_gb    = $sizeGb
+            free_gb    = $freeGb
+            bootable   = if ($ld.DeviceID -eq "C:") { "Yes" } else { "No" }
+            health     = $health
+            ssd_hdd    = $mediaType
         }
     }
 } catch {}
 
-# ────────────────────────────────────────────────────────────────────────────
-#  PHASE 2 — FULL SOFTWARE INVENTORY
-# ────────────────────────────────────────────────────────────────────────────
+Write-Host "Collecting physical disk details..." -ForegroundColor Cyan
+try {
+    $pDisk = Get-PhysicalDisk | Select-Object -First 1
+    if ($pDisk) {
+        $mType = if ($pDisk.MediaType) { $pDisk.MediaType.ToString() } else { "SSD" }
+        $hStat = if ($pDisk.HealthStatus) { $pDisk.HealthStatus.ToString() } else { "Healthy" }
+        foreach ($dp in $diskPartitions) {
+            $dp.ssd_hdd = $mType
+            $dp.health  = $hStat
+        }
+    }
+} catch {}
 
-# 18. Full Installed Software Inventory (Registry Scan)
-Write-Host "Scanning installed software (this may take a moment)..." -ForegroundColor Yellow
+$diskSummaryStr = if ($diskSummaryLines.Count -gt 0) { $diskSummaryLines -join "`n" } else { "Unknown" }
+
+# ---------------------------------------------------------
+# Battery Diagnostics
+# ---------------------------------------------------------
+$batteryHealth = "N/A (Desktop)"
+$cycleCount = "N/A"
+$chargePercent = "N/A"
+$designCapacity = "N/A"
+$fullCapacity = "N/A"
+
+if ($deviceType -eq "Laptop") {
+    try {
+        $bat = Get-CimInstance Win32_Battery
+        if ($bat) {
+            $chargePercent = "$($bat.EstimatedChargeRemaining)%"
+            $batteryHealth = if ($bat.Status) { $bat.Status } else { "Good" }
+        }
+    } catch {}
+    
+    try {
+        $bFull = Get-CimInstance -Namespace "root\wmi" -Class BatteryFullChargedCapacity -ErrorAction SilentlyContinue
+        if ($bFull -and $bFull.FullChargedCapacity) { $fullCapacity = "$($bFull.FullChargedCapacity) mWh" }
+        $bDesign = Get-CimInstance -Namespace "root\wmi" -Class BatteryStaticData -ErrorAction SilentlyContinue
+        if ($bDesign -and $bDesign.DesignedCapacity) { $designCapacity = "$($bDesign.DesignedCapacity) mWh" }
+        $bCycle = Get-CimInstance -Namespace "root\wmi" -Class BatteryCycleCount -ErrorAction SilentlyContinue
+        if ($bCycle -and $bCycle.CycleCount) { $cycleCount = Get-SafeString $bCycle.CycleCount }
+    } catch {}
+}
+
+# ---------------------------------------------------------
+# Users & Accounts
+# ---------------------------------------------------------
+$userAccounts = @()
+try {
+    $users = Get-CimInstance Win32_UserAccount -Filter "LocalAccount=True"
+    foreach ($u in $users) {
+        $userAccounts += @{
+            name       = Get-SafeString $u.Name
+            disabled   = if ($u.Disabled) { "True" } else { "False" }
+            last_login = "Unknown"
+            logon_type = "Local"
+        }
+    }
+} catch {}
+
+# ---------------------------------------------------------
+# Software Inventory
+# ---------------------------------------------------------
+Write-Host "Scanning installed software (this may take a moment)..." -ForegroundColor Cyan
 $softwareInventory = @()
 try {
-    $regPaths = @(
+    $keys = @(
         "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*",
-        "HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*",
+        "HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*",
         "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*"
     )
-    $allApps = Get-ItemProperty $regPaths -ErrorAction SilentlyContinue |
-        Where-Object { $_.DisplayName -and $_.DisplayName.Trim() -ne "" } |
-        Sort-Object DisplayName -Unique
-    foreach ($app in $allApps) {
-        $sizeMB = "Unknown"
-        if ($app.EstimatedSize -and $app.EstimatedSize -gt 0) {
-            $sizeMB = [math]::Round($app.EstimatedSize / 1024, 2).ToString() + " MB"
-        }
+    $installed = Get-ItemProperty $keys -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -and $_.DisplayName -notmatch '^KB' }
+    foreach ($app in $installed) {
+        $date = Get-SafeString $app.InstallDate
+        if ($date -match "^20[0-9]{6}$") { $date = $date.Insert(4,"-").Insert(7,"-") }
+        $size = "Unknown"
+        if ($app.EstimatedSize -gt 0) { $size = "{0:N2}" -f ($app.EstimatedSize / 1024) }
+        
         $softwareInventory += @{
-            name         = Get-SafeString $app.DisplayName ""
-            version      = Get-SafeString $app.DisplayVersion "Unknown"
-            publisher    = Get-SafeString $app.Publisher "Unknown"
-            install_date = Get-SafeString $app.InstallDate "Unknown"
-            size_mb      = $sizeMB
+            name         = Get-SafeString $app.DisplayName
+            version      = Get-SafeString $app.DisplayVersion
+            publisher    = Get-SafeString $app.Publisher
+            install_date = $date
+            size_mb      = $size
         }
     }
-    Write-Host "Found $($softwareInventory.Count) installed applications." -ForegroundColor Green
 } catch {}
 
-# ────────────────────────────────────────────────────────────────────────────
-#  19. Collect Login History
-# ────────────────────────────────────────────────────────────────────────────
+Write-Host "Found $($softwareInventory.Count) installed applications." -ForegroundColor Green
+
+# ---------------------------------------------------------
+# Recent Login History
+# ---------------------------------------------------------
 Write-Host "Collecting recent login history..." -ForegroundColor Cyan
 $loginHistory = @()
-
-$isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-
-if ($isAdmin) {
-    # Full history from Security event log (requires Admin)
-    # LogonType: 2=Interactive, 7=Unlock, 10=RemoteInteractive(RDP), 11=CachedInteractive
-    try {
-        $events = Get-WinEvent -FilterHashtable @{LogName='Security'; Id=4624} -MaxEvents 200 -ErrorAction Stop
-        foreach ($event in $events) {
-            $xml = [xml]$event.ToXml()
-            $logonType = ($xml.Event.EventData.Data | Where-Object { $_.Name -eq 'LogonType' }).'#text'
-            if ($logonType -in '2', '7', '10', '11') {
-                $targetUser = ($xml.Event.EventData.Data | Where-Object { $_.Name -eq 'TargetUserName' }).'#text'
-                $targetDomain = ($xml.Event.EventData.Data | Where-Object { $_.Name -eq 'TargetDomainName' }).'#text'
-                if ($targetUser -and $targetUser -notmatch 'SYSTEM|UMFD|DWM|ANONYMOUS|Font Driver' -and $targetUser -notmatch '\$') {
-                    $typeLabel = switch ($logonType) {
-                        '2'  { 'Local Interactive' }
-                        '7'  { 'Unlock' }
-                        '10' { 'Remote (RDP)' }
-                        '11' { 'Cached Interactive' }
-                        default { "Type $logonType" }
-                    }
-                    $loginHistory += @{
-                        username   = Get-SafeString $targetUser "Unknown"
-                        domain     = Get-SafeString $targetDomain "Unknown"
-                        logon_type = $typeLabel
-                        time       = $event.TimeCreated.ToString("yyyy-MM-dd HH:mm:ss")
-                    }
-                }
+try {
+    $events = Get-WinEvent -FilterHashtable @{LogName='Security'; Id=4624} -MaxEvents 40 -ErrorAction SilentlyContinue
+    foreach ($e in $events) {
+        $user = $e.Properties[5].Value
+        $domain = $e.Properties[6].Value
+        $typeVal = $e.Properties[8].Value
+        if ($user -and $user -notmatch '^\$' -and $user -notmatch 'SYSTEM|LOCAL SERVICE|NETWORK SERVICE|ANONYMOUS|DWM-|UMFD-') {
+            $logonType = switch ($typeVal) {
+                2 { "Interactive (Local)" }
+                7 { "Unlock" }
+                10 { "Remote (RDP)" }
+                11 { "Cached Interactive" }
+                default { "Logon ($typeVal)" }
             }
+            $loginHistory += @{
+                username   = Get-SafeString $user
+                domain     = Get-SafeString $domain
+                logon_type = $logonType
+                time       = $e.TimeCreated.ToString("yyyy-MM-dd HH:mm:ss")
+            }
+            if ($loginHistory.Count -ge 15) { break }
         }
-        # Keep most recent 20 entries
-        if ($loginHistory.Count -gt 20) { $loginHistory = $loginHistory[0..19] }
-    } catch {}
-}
+    }
+} catch {}
 
-# Fallback (always runs): Get-LocalUser LastLogon — works without Admin
 if ($loginHistory.Count -eq 0) {
     try {
-        $localUsers = Get-LocalUser -ErrorAction SilentlyContinue | Where-Object { $_.LastLogon -ne $null }
-        foreach ($u in $localUsers) {
+        $profiles = Get-CimInstance Win32_NetworkLoginProfile | Where-Object { $_.LastLogon -and $_.Name -notmatch 'SYSTEM|NETWORK|LOCAL' }
+        foreach ($p in $profiles) {
             $loginHistory += @{
-                username   = Get-SafeString $u.Name "Unknown"
-                domain     = $env:COMPUTERNAME
-                logon_type = "Local (Last Known)"
-                time       = $u.LastLogon.ToString("yyyy-MM-dd HH:mm:ss")
+                username   = Get-SafeString $p.Name
+                domain     = "Local"
+                logon_type = "Local"
+                time       = $p.LastLogon.ToString("yyyy-MM-dd HH:mm:ss")
             }
         }
     } catch {}
 }
 
-
-# ────────────────────────────────────────────────────────────────────────────
-#  20. Construct JSON Data Payload
-# ────────────────────────────────────────────────────────────────────────────
+# ---------------------------------------------------------
+# Payload Construction
+# ---------------------------------------------------------
 $data = @{
     execution_datetime    = $executionDateTime
     consent               = $consentText
     computer_name         = $computer
+    current_user          = $currentUser
+    
     os_name               = $osName
     os_version            = $osVersion
+    os_build              = $osBuild
+    last_boot             = $lastBoot
+    uptime                = $uptime
     architecture          = $architecture
+    
     license_status        = $licenseStatus
-    hotfixes              = $hotfixes
-    mac_address           = $mac
-    drive_name            = $driveName
-    compression_utilities = $compressionUtilities
     antivirus             = $antivirus
-    printers              = $printers
+    firewall              = $firewall
+    bitlocker             = $bitlocker
+    secure_boot           = $secureBoot
+    tpm                   = $tpm
+    
+    hotfixes              = @()
+    mac_address           = $mac
+    drive_name            = "No CD Unit Found"
+    compression_utilities = @()
+    printers              = @()
+    
     hardware_details      = @{
-        cpu              = $cpuName
-        ram              = $ramTotal
-        disk             = $diskBasic
-        gpu_details      = $gpuDetails
-        serial_number    = $serialNumber
-        manufacturer     = $manufacturer
-        model            = $model
-        network_adapters = $networkAdapters
-        peripherals      = $peripherals
-        disk_partitions  = $diskPartitions
+        cpu               = $processorName
+        ram               = $ramTotalStr
+        disk              = $diskSummaryStr
+        
+        device_name       = $computer
+        manufacturer      = $manufacturer
+        model             = $model
+        serial_number     = $serialNumber
+        asset_tag         = $assetTag
+        device_type       = $deviceType
+        architecture      = $architecture
+        
+        processor_name    = $processorName
+        cpu_cores         = $cpuCores
+        cpu_threads       = $cpuThreads
+        
+        installed_ram     = $ramTotalStr
+        ram_slots         = $ramSlots
+        
+        mobo_manufacturer = $moboManufacturer
+        mobo_product      = $moboProduct
+        mobo_version      = $moboVersion
+        mobo_serial       = $moboSerial
+        bios_version      = $biosVersion
+        bios_date         = $biosDate
+        
+        battery_health    = $batteryHealth
+        cycle_count       = $cycleCount
+        charge_percent    = $chargePercent
+        design_capacity   = $designCapacity
+        full_capacity     = $fullCapacity
+        location_info     = $locationInfo
+        
+        gpu_details       = $gpuDetails
+        network_adapters  = $networkAdapters
+        peripherals       = $peripherals
+        disk_partitions   = $diskPartitions
     }
-    network_details       = $networkDetails
+    network_details       = $networkAdapters
     user_accounts         = $userAccounts
     software_inventory    = $softwareInventory
     login_history         = $loginHistory
 }
 
 $json = $data | ConvertTo-Json -Depth 8
-
-# Capture dynamic client id parameter from backend injection
 $client_id = "CLIENT_ID_PLACEHOLDER"
-
-# API URL (dynamically replaced by backend during serving)
 $apiUrl = "http://127.0.0.1:8000/upload-audit?client_id=$client_id"
 
 $jsonBytes = [System.Text.Encoding]::UTF8.GetBytes($json)
 
 Write-Host "Uploading secure payload to backend..." -ForegroundColor Yellow
 $uploaded = $false
-
-# Attempt 1: Invoke-RestMethod with explicit 5-minute timeout
 try {
     $res = Invoke-RestMethod -Uri $apiUrl -Method POST -Body $jsonBytes -ContentType "application/json; charset=utf-8" -TimeoutSec 300
     Write-Host "Audit upload completed successfully!" -ForegroundColor Green
@@ -424,7 +498,6 @@ try {
     Write-Host "Attempt 1 failed, retrying with WebClient..." -ForegroundColor Yellow
 }
 
-# Attempt 2: Use .NET WebClient (no timeout limit)
 if (-not $uploaded) {
     try {
         $wc = New-Object System.Net.WebClient
@@ -435,8 +508,5 @@ if (-not $uploaded) {
         $uploaded = $true
     } catch {
         Write-Host "Upload failed: $_" -ForegroundColor Red
-        if ($_.ErrorDetails.Message) {
-            Write-Host $_.ErrorDetails.Message -ForegroundColor Red
-        }
     }
 }
