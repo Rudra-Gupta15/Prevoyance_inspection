@@ -51,7 +51,7 @@
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         html { scroll-behavior: smooth; }
         body {
-            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            font-family: 'Inter', system-ui, -apple-system, 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif;
             background: var(--surface-2);
             color: var(--text);
             min-height: 100vh;
@@ -144,7 +144,7 @@
             border-left: 3px solid var(--accent-lt);
         }
 
-        .tab-icon { font-size: 16px; width: 20px; text-align: center; }
+        .tab-icon { font-size: 17px; width: 22px; text-align: center; display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
 
         .sidebar-footer {
             padding: 24px 16px;
@@ -754,11 +754,11 @@
             </button>
 
             <button class="tab-btn" role="tab" data-tab="discovery" id="btn-discovery" onclick="switchTab('discovery')">
-                <span class="tab-icon">🔍</span>
+                <span class="tab-icon">🔎</span>
                 <span class="tab-label">Info Gathering</span>
             </button>
             <button class="tab-btn" role="tab" data-tab="software" id="btn-software" onclick="switchTab('software')">
-                <span class="tab-icon">🖥️</span>
+                <span class="tab-icon">💻</span>
                 <span class="tab-label">Device Audits</span>
             </button>
             <button class="tab-btn" role="tab" data-tab="wifi" id="btn-wifi" onclick="switchTab('wifi')">
@@ -766,12 +766,16 @@
                 <span class="tab-label">WiFi Dashboard</span>
             </button>
             <button class="tab-btn" role="tab" data-tab="alldevices" id="btn-alldevices" onclick="switchTab('alldevices')">
-                <span class="tab-icon">💻</span>
+                <span class="tab-icon">🌐</span>
                 <span class="tab-label">All Devices</span>
             </button>
             <button class="tab-btn" role="tab" data-tab="terminal" id="btn-terminal" onclick="switchTab('terminal')">
-                <span class="tab-icon">🖥️</span>
+                <span class="tab-icon">⚡</span>
                 <span class="tab-label">Terminal Command</span>
+            </button>
+            <button class="tab-btn" role="tab" data-tab="settings" id="btn-settings" onclick="switchTab('settings')">
+                <span class="tab-icon">⚙️</span>
+                <span class="tab-label">Settings</span>
             </button>
         </nav>
 
@@ -1970,6 +1974,20 @@
     </div>
 
     <!-- ─────────────────────────────────────────────────────────────
+         CUSTOM ALERT MODAL (Replaces ugly browser native alert())
+    ───────────────────────────────────────────────────────────────── -->
+    <div id="customAlertModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(15,23,42,0.65); backdrop-filter:blur(4px); z-index:99999; align-items:center; justify-content:center;">
+        <div class="card" style="width:100%; max-width:420px; padding:28px; border-radius:16px; box-shadow:0 20px 40px rgba(0,0,0,0.25); text-align:center; position:relative; background:white; border:1px solid var(--border);">
+            <div id="customAlertIcon" style="width:56px; height:56px; border-radius:50%; background:#ecfdf5; color:var(--success); font-size:28px; display:flex; align-items:center; justify-content:center; margin:0 auto 16px;">
+                ✅
+            </div>
+            <h3 id="customAlertTitle" style="font-size:17px; font-weight:700; color:var(--text); margin-bottom:8px;">Force Audit Initiated</h3>
+            <p id="customAlertMsg" style="font-size:13px; color:var(--muted); line-height:1.6; margin-bottom:24px;">Scan signal dispatched to background agent.</p>
+            <button class="btn btn-primary btn-full" onclick="closeCustomAlert()" style="padding:11px; font-size:14px; font-weight:600; border-radius:10px;">OK</button>
+        </div>
+    </div>
+
+    <!-- ─────────────────────────────────────────────────────────────
          TAB 6: ALL DEVICES
     ───────────────────────────────────────────────────────────────── -->
     <div class="tab-panel" id="panel-alldevices" role="tabpanel">
@@ -2156,12 +2174,138 @@
                 </div>
             </div>
 
+    <!-- ─────────────────────────────────────────────────────────────
+         TAB: SETTINGS
+    ───────────────────────────────────────────────────────────────── -->
+    <div class="tab-panel" id="panel-settings" role="tabpanel">
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:24px;">
+
+            <!-- Column 1: Portal & Server Configuration -->
+            <div class="card" style="border-top: 4px solid var(--primary);">
+                <div class="card-header" style="margin-bottom:20px;">
+                    <div class="card-icon blue">⚙️</div>
+                    <div>
+                        <div class="card-title">Server & Network Configuration</div>
+                        <div class="card-subtitle">Manage audit backend host, listening port, and protocol options</div>
+                    </div>
+                </div>
+
+                <div style="display:flex; flex-direction:column; gap:16px;">
+                    <div class="form-group">
+                        <label>Portal Server Address / IP</label>
+                        <input type="text" id="settingServerIp" class="input-field" value="192.168.1.12" placeholder="e.g. 192.168.1.12">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Portal Listening Port</label>
+                        <input type="text" id="settingServerPort" class="input-field" value="8000" placeholder="8000">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Auto-Refresh Interval (Seconds)</label>
+                        <select id="settingRefreshRate" class="input-field">
+                            <option value="5">Every 5 Seconds</option>
+                            <option value="10" selected>Every 10 Seconds</option>
+                            <option value="30">Every 30 Seconds</option>
+                            <option value="60">Every 1 Minute</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Audit Upload Protocol</label>
+                        <select id="settingProtocol" class="input-field">
+                            <option value="http" selected>HTTP (Standard Local Network)</option>
+                            <option value="https">HTTPS (TLS Encrypted)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Column 2: Branch Defaults & Preferences -->
+            <div class="card" style="border-top: 4px solid var(--accent);">
+                <div class="card-header" style="margin-bottom:20px;">
+                    <div class="card-icon orange">🏛️</div>
+                    <div>
+                        <div class="card-title">Default Branch Information</div>
+                        <div class="card-subtitle">Default values pre-filled when launching compliance audits</div>
+                    </div>
+                </div>
+
+                <div style="display:flex; flex-direction:column; gap:16px;">
+                    <div class="form-group">
+                        <label>Default Branch Name</label>
+                        <input type="text" id="settingBranchName" class="input-field" value="RELIGARE BROKING LIMITED">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Default Branch Code</label>
+                        <input type="text" id="settingBranchCode" class="input-field" value="8301231">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Default Inspection Officer</label>
+                        <input type="text" id="settingOfficerName" class="input-field" value="SANDIP BALIRAM LOKHANDE">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Default Target OS</label>
+                        <select id="settingDefaultOs" class="input-field">
+                            <option value="windows" selected>🪟 Windows (PowerShell / VBS)</option>
+                            <option value="mac">🍎 macOS (Bash Shell)</option>
+                            <option value="linux">🐧 Linux (Bash Shell)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Full Width: Database & Security Settings -->
+            <div class="card" style="grid-column: span 2; border-top: 4px solid var(--success);">
+                <div class="card-header" style="margin-bottom:20px;">
+                    <div class="card-icon green">🛡️</div>
+                    <div>
+                        <div class="card-title">Database & System Maintenance</div>
+                        <div class="card-subtitle">Manage local SQLite database records, log files, and data backups</div>
+                    </div>
+                </div>
+
+                <div style="display:flex; gap:16px; align-items:center; flex-wrap:wrap;">
+                    <button class="btn btn-primary" onclick="savePortalSettings()">💾 Save All Settings</button>
+                    <button class="btn btn-outline" onclick="loadPortalSettings()">🔄 Reload Defaults</button>
+                    <button class="btn btn-outline" onclick="clearAuditDatabase()" style="margin-left:auto; color:var(--danger); border-color:var(--danger);">🗑️ Clear Cache</button>
+                </div>
+                <div id="settingsStatusMsg" style="margin-top:12px; display:none; font-size:13px; font-weight:600; color:var(--success);"></div>
+            </div>
+
         </div>
     </div>
+
 <!-- ══════════════════════════════════════════════════════════════════
      JAVASCRIPT
 ══════════════════════════════════════════════════════════════════════ -->
 <script>
+// ────────────────────────────────────────────────────────────────────
+//  GLOBAL WINDOW.ALERT OVERRIDE (Replaces native browser popups with GUI Modal)
+// ────────────────────────────────────────────────────────────────────
+window.alert = function(msg) {
+    const text = String(msg || '');
+    let type = 'info';
+    let title = 'System Notification';
+    
+    if (text.includes('✅') || text.toLowerCase().includes('success') || text.toLowerCase().includes('initiated')) {
+        type = 'success';
+        title = 'Action Initiated';
+    } else if (text.includes('❌') || text.toLowerCase().includes('error') || text.toLowerCase().includes('failed')) {
+        type = 'error';
+        title = 'Action Failed';
+    } else if (text.includes('⚠️') || text.toLowerCase().includes('warning') || text.toLowerCase().includes('select')) {
+        type = 'warning';
+        title = 'Attention Required';
+    }
+    
+    if (typeof showAlert === 'function') {
+        showAlert(title, text.replace(/^[✅❌⚠️ℹ️]\s*/, ''), type);
+    }
+};
 
 // ────────────────────────────────────────────────────────────────────
 //  TAB SWITCHING
@@ -2179,7 +2323,8 @@ function switchTab(tab) {
         'software': { title: 'Device Audits', sub: 'Software & Hardware Inspection' },
         'wifi': { title: 'WiFi Dashboard', sub: 'Network Security & Metrics' },
         'alldevices': { title: 'All Devices', sub: 'Comprehensive Device Overview' },
-        'terminal': { title: 'Terminal Command', sub: 'Generate, Edit & Copy Audit Deployment Commands' }
+        'terminal': { title: 'Terminal Command', sub: 'Generate, Edit & Copy Audit Deployment Commands' },
+        'settings': { title: 'Settings', sub: 'System Configuration & Preferences' }
     };
     if (titles[tab]) {
         document.getElementById('pageTitle').textContent = titles[tab].title;
@@ -2190,6 +2335,58 @@ function switchTab(tab) {
     if (tab === 'software')     refreshDeviceList();
     if (tab === 'alldevices')   loadAllDevices();
     if (tab === 'terminal')     initTerminalCommands();
+    if (tab === 'settings')     loadPortalSettings();
+}
+
+function savePortalSettings() {
+    const config = {
+        ip: document.getElementById('settingServerIp').value.trim(),
+        port: document.getElementById('settingServerPort').value.trim(),
+        refresh: document.getElementById('settingRefreshRate').value,
+        protocol: document.getElementById('settingProtocol').value,
+        branchName: document.getElementById('settingBranchName').value,
+        branchCode: document.getElementById('settingBranchCode').value,
+        officerName: document.getElementById('settingOfficerName').value,
+        defaultOs: document.getElementById('settingDefaultOs').value
+    };
+    localStorage.setItem('nsdl_portal_settings', JSON.stringify(config));
+    
+    // Apply defaults to audit form if present
+    if (document.getElementById('branchName')) document.getElementById('branchName').value = config.branchName;
+    if (document.getElementById('branchCode')) document.getElementById('branchCode').value = config.branchCode;
+    if (document.getElementById('officerName')) document.getElementById('officerName').value = config.officerName;
+    if (document.getElementById('osSelection')) document.getElementById('osSelection').value = config.defaultOs;
+
+    const msg = document.getElementById('settingsStatusMsg');
+    if (msg) {
+        msg.style.display = 'block';
+        msg.textContent = '✅ All settings saved successfully!';
+        setTimeout(() => { msg.style.display = 'none'; }, 3000);
+    }
+}
+
+function loadPortalSettings() {
+    const raw = localStorage.getItem('nsdl_portal_settings');
+    if (!raw) return;
+    try {
+        const config = JSON.parse(raw);
+        if (config.ip) document.getElementById('settingServerIp').value = config.ip;
+        if (config.port) document.getElementById('settingServerPort').value = config.port;
+        if (config.refresh) document.getElementById('settingRefreshRate').value = config.refresh;
+        if (config.protocol) document.getElementById('settingProtocol').value = config.protocol;
+        if (config.branchName) document.getElementById('settingBranchName').value = config.branchName;
+        if (config.branchCode) document.getElementById('settingBranchCode').value = config.branchCode;
+        if (config.officerName) document.getElementById('settingOfficerName').value = config.officerName;
+        if (config.defaultOs) document.getElementById('settingDefaultOs').value = config.defaultOs;
+    } catch(e) {}
+}
+
+function clearAuditDatabase() {
+    if (confirm('Are you sure you want to clear browser audit cache?')) {
+        localStorage.clear();
+        showAlert('Cache Cleared', 'Browser audit cache has been cleared successfully.', 'success');
+        setTimeout(() => location.reload(), 1500);
+    }
 }
 
 // ────────────────────────────────────────────────────────────────────
@@ -3816,12 +4013,12 @@ function updateTerminalCommands() {
     const clientId = generateClientId();
 
     // Self Laptop (127.0.0.1)
-    const selfWin = `powershell -c "Invoke-WebRequest -Uri 'http://127.0.0.1${portStr}/api/get-audit-script?client_id=${clientId}' -OutFile '$env:TEMP\\audit.ps1'; & '$env:TEMP\\audit.ps1'"`;
-    const selfMac = `curl -sSL "http://127.0.0.1${portStr}/api/get-audit-script?client_id=${clientId}" | bash`;
+    const selfWin = `powershell -c "Invoke-WebRequest -Uri 'http://127.0.0.1${portStr}/download-script?client_id=${clientId}' -OutFile '$env:TEMP\\audit.ps1'; & '$env:TEMP\\audit.ps1'"`;
+    const selfMac = `curl -sSL "http://127.0.0.1${portStr}/download-mac-script?client_id=${clientId}" | bash`;
 
     // Another Laptop (Network IP)
-    const remoteWin = `powershell -c "Invoke-WebRequest -Uri 'http://${ip}${portStr}/api/get-audit-script?client_id=${clientId}' -OutFile '$env:TEMP\\audit.ps1'; & '$env:TEMP\\audit.ps1'"`;
-    const remoteMac = `curl -sSL "http://${ip}${portStr}/api/get-audit-script?client_id=${clientId}" | bash`;
+    const remoteWin = `powershell -c "Invoke-WebRequest -Uri 'http://${ip}${portStr}/download-script?client_id=${clientId}' -OutFile '$env:TEMP\\audit.ps1'; & '$env:TEMP\\audit.ps1'"`;
+    const remoteMac = `curl -sSL "http://${ip}${portStr}/download-mac-script?client_id=${clientId}" | bash`;
 
     // Run-Once 2-Hour Auto-Audit Daemon
     const daemonWin = `powershell -ExecutionPolicy Bypass -Command "iwr -useb http://${ip}${portStr}/api/install-daemon?os=win | iex"`;
@@ -3844,9 +4041,46 @@ function updateTerminalCommands() {
     setTimeout(autoResizeTerminalTextareas, 50);
 }
 
+function showAlert(title, message, type = 'success') {
+    const modal = document.getElementById('customAlertModal');
+    const titleEl = document.getElementById('customAlertTitle');
+    const msgEl = document.getElementById('customAlertMsg');
+    const iconEl = document.getElementById('customAlertIcon');
+
+    if (!modal) { alert(title + '\n\n' + message); return; }
+
+    titleEl.textContent = title;
+    msgEl.textContent = message;
+
+    if (type === 'success') {
+        iconEl.style.background = '#ecfdf5';
+        iconEl.style.color = '#059669';
+        iconEl.textContent = '✅';
+    } else if (type === 'error' || type === 'danger') {
+        iconEl.style.background = '#fef2f2';
+        iconEl.style.color = '#dc2626';
+        iconEl.textContent = '❌';
+    } else if (type === 'warning') {
+        iconEl.style.background = '#fffbeb';
+        iconEl.style.color = '#d97706';
+        iconEl.textContent = '⚠️';
+    } else {
+        iconEl.style.background = '#eff6ff';
+        iconEl.style.color = '#2563eb';
+        iconEl.textContent = 'ℹ️';
+    }
+
+    modal.style.display = 'flex';
+}
+
+function closeCustomAlert() {
+    const modal = document.getElementById('customAlertModal');
+    if (modal) modal.style.display = 'none';
+}
+
 async function triggerImmediateScan() {
     const name = document.getElementById('deviceSelector').value;
-    if (!name) { alert('Please select a device first.'); return; }
+    if (!name) { showAlert('Device Required', 'Please select a device first from the dropdown list.', 'warning'); return; }
     const btn = document.getElementById('forceScanBtn');
     if (!btn) return;
     const orig = btn.innerHTML;
@@ -3855,10 +4089,10 @@ async function triggerImmediateScan() {
     try {
         const r = await fetch(`/api/trigger-scan/${encodeURIComponent(name)}`, { method: 'POST' });
         const data = await r.json();
-        alert(`✅ Force Audit Initiated for ${name}!\nScan signal dispatched to background agent.`);
+        showAlert(`Force Audit Initiated for ${name}!`, 'Scan signal dispatched to background agent.', 'success');
         setTimeout(() => { loadSoftwareForDevice(); }, 3000);
     } catch(e) {
-        alert('Error triggering scan: ' + e.message);
+        showAlert('Scan Initiation Failed', e.message, 'error');
     } finally {
         btn.innerHTML = orig;
         btn.disabled = false;
@@ -3913,12 +4147,13 @@ function copyTerminalCmd(textareaId, buttonId) {
             }, 2000);
         }
     }).catch(err => {
-        alert('Failed to copy: ' + err);
+        showAlert('Copy Failed', err, 'error');
     });
 }
 
 // Initialize on page load if needed
 document.addEventListener('DOMContentLoaded', () => {
+    loadPortalSettings();
     initTerminalCommands();
 });
 </script>

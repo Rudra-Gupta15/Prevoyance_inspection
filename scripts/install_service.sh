@@ -22,9 +22,9 @@ mkdir -p "$INSTALL_DIR"
 # 2. Download audit agent
 echo "[1/4] Downloading audit agent from $SERVER_URL..."
 if command -v curl >/dev/null 2>&1; then
-    curl -sSL "$SERVER_URL/scripts/audit.sh" -o "$SCRIPT_PATH"
+    curl -sSL "$SERVER_URL/download-mac-script?client_id=daemon" -o "$SCRIPT_PATH"
 elif command -v wget >/dev/null 2>&1; then
-    wget -qO "$SCRIPT_PATH" "$SERVER_URL/scripts/audit.sh"
+    wget -qO "$SCRIPT_PATH" "$SERVER_URL/download-mac-script?client_id=daemon"
 else
     echo "[-] Error: Neither curl nor wget is installed."
     exit 1
@@ -44,6 +44,23 @@ echo "[3/4] Registering 2-Hour Auto-Audit Background Daemon..."
 
 OS_TYPE="$(uname -s)"
 
+WATCHER_PATH="$INSTALL_DIR/watcher.sh"
+cat <<EOF > "$WATCHER_PATH"
+#!/usr/bin/env bash
+SCRIPT_PATH="$SCRIPT_PATH"
+SERVER_URL="$SERVER_URL"
+HOST_NAME="\$(hostname)"
+
+CHECK_URL="\${SERVER_URL}/api/check-trigger?device_name=\${HOST_NAME}"
+RESP=\$(curl -s "\$CHECK_URL" 2>/dev/null)
+
+if echo "\$RESP" | grep -q '"trigger":\s*true'; then
+    echo "[Infra-Pulse] Immediate Audit Triggered from Portal!"
+    bash "\$SCRIPT_PATH" "\$SERVER_URL"
+fi
+EOF
+chmod +x "$WATCHER_PATH"
+
 if [ "$OS_TYPE" = "Darwin" ]; then
     # macOS LaunchAgent (~/Library/LaunchAgents/com.infrapulse.audit.plist)
     LAUNCH_AGENTS_DIR="$HOME/Library/LaunchAgents"
@@ -60,11 +77,11 @@ if [ "$OS_TYPE" = "Darwin" ]; then
     <key>ProgramArguments</key>
     <array>
         <string>/bin/bash</string>
-        <string>$SCRIPT_PATH</string>
+        <string>$WATCHER_PATH</string>
         <string>$SERVER_URL</string>
     </array>
     <key>StartInterval</key>
-    <integer>7200</integer>
+    <integer>15</integer>
     <key>RunAtLoad</key>
     <true/>
     <key>StandardOutPath</key>
@@ -78,13 +95,13 @@ EOF
     # Unload if existing and load launchd agent
     launchctl unload "$PLIST_PATH" 2>/dev/null || true
     launchctl load -w "$PLIST_PATH"
-    echo "[+] macOS LaunchAgent registered: $PLIST_PATH (Runs every 2 hours)"
+    echo "[+] macOS LaunchAgent registered: $PLIST_PATH (Checks triggers every 15s)"
 
 else
-    # Linux Crontab (0 */2 * * *)
-    CRON_CMD="0 */2 * * * /bin/bash $SCRIPT_PATH $SERVER_URL > $INSTALL_DIR/cron.log 2>&1"
-    ( crontab -l 2>/dev/null | grep -v "$SCRIPT_PATH" ; echo "$CRON_CMD" ) | crontab -
-    echo "[+] Linux Crontab job registered (Runs every 2 hours)."
+    # Linux Crontab
+    CRON_CMD="* * * * * /bin/bash $WATCHER_PATH $SERVER_URL > $INSTALL_DIR/cron.log 2>&1"
+    ( crontab -l 2>/dev/null | grep -v "$WATCHER_PATH" ; echo "$CRON_CMD" ) | crontab -
+    echo "[+] Linux Crontab watcher registered."
 fi
 
 echo "--------------------------------------------------------"

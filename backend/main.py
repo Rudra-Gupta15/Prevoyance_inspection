@@ -422,8 +422,24 @@ def download_vbs(
 
 
 @app.get("/download-mac-script", response_class=PlainTextResponse)
+@app.get("/api/get-audit-script", response_class=PlainTextResponse)
 def download_mac_script(request: Request, client_id: str = Query(...)):
+    user_agent = request.headers.get("user-agent", "").lower()
     base_url = str(request.base_url).rstrip("/")
+    
+    # If request is coming from Windows PowerShell/Windows WebRequest, serve audit.ps1
+    if "powershell" in user_agent or "windows" in user_agent or "winhttp" in user_agent:
+        try:
+            with open("scripts/audit.ps1", "r") as f:
+                content = f.read()
+            content = content.replace("http://127.0.0.1:8000", base_url)
+            content = content.replace("CLIENT_ID_PLACEHOLDER", client_id)
+            return PlainTextResponse(content=content)
+        except Exception as e:
+            logger.error(f"Failed to load audit.ps1: {e}")
+            raise HTTPException(status_code=500, detail="PowerShell script unavailable.")
+            
+    # Default (macOS / Linux / bash / curl)
     try:
         with open("scripts/audit.sh", "r") as f:
             content = f.read()
@@ -433,6 +449,24 @@ def download_mac_script(request: Request, client_id: str = Query(...)):
     except Exception as e:
         logger.error(f"Failed to load audit.sh: {e}")
         raise HTTPException(status_code=500, detail="Bash script unavailable.")
+
+
+app.mount("/scripts", StaticFiles(directory="scripts"), name="scripts")
+
+
+@app.get("/api/install-daemon", response_class=PlainTextResponse)
+def install_daemon(request: Request, os: str = Query("mac")):
+    base_url = str(request.base_url).rstrip("/")
+    script_file = "scripts/install_service.ps1" if os in ["win", "windows"] else "scripts/install_service.sh"
+    try:
+        with open(script_file, "r") as f:
+            content = f.read()
+        content = content.replace("http://192.168.1.52:8000", base_url)
+        content = content.replace("http://127.0.0.1:8000", base_url)
+        return PlainTextResponse(content=content)
+    except Exception as e:
+        logger.error(f"Failed to load daemon installer script ({script_file}): {e}")
+        raise HTTPException(status_code=500, detail="Daemon installer unavailable.")
 
 
 @app.get("/download-mac")
@@ -2038,14 +2072,30 @@ def get_install_daemon(request: Request, target_os: str = Query(None, alias="os"
 
     return PlainTextResponse(script_content, media_type=media_type)
 
+pending_scan_triggers = set()
+
+
 @app.post("/api/trigger-scan/{device_id}")
 def trigger_immediate_scan(device_id: str):
     logger.info(f"Manual force-scan requested for device: {device_id}")
+    clean_id = device_id.strip().lower()
+    pending_scan_triggers.add(clean_id)
+    pending_scan_triggers.add("ALL")
     return {
         "status": "triggered",
         "device_id": device_id,
-        "message": f"Scan signal initiated for {device_id}. Compliance audit running in background."
+        "message": f"Scan signal initiated for {device_id}. Target agent will execute scan immediately."
     }
+
+
+@app.get("/api/check-trigger")
+def check_trigger(device_name: str = Query(...)):
+    triggered = False
+    if pending_scan_triggers:
+        triggered = True
+        pending_scan_triggers.clear()
+        logger.info(f"Trigger delivered to checking daemon: {device_name}")
+    return {"trigger": triggered}
 
 # ==============================================================================
 # 10. SERVE FRONTEND (UI)

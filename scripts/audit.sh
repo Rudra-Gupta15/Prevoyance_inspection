@@ -62,7 +62,9 @@ fi
 DRIVE_NAME="No CD Unit Found"
 COMPRESSION_UTILITIES='["tar", "gzip", "zip (built-in)"]'
 ANTIVIRUS='["Built-in OS Protections"]'
-PRINTERS=$(python3 - 2>/dev/null <<'PYEOF'
+PRINTERS="[]"
+if [ "$PYTHON3_OK" = "true" ]; then
+    PRINTERS=$(python3 - 2>/dev/null <<'PYEOF'
 import subprocess, json, re
 printers = []
 try:
@@ -83,7 +85,8 @@ except Exception:
     pass
 print(json.dumps(printers))
 PYEOF
-)
+    )
+fi
 if [ -z "$PRINTERS" ] || [ "$PRINTERS" = "null" ]; then
     PRINTERS="[]"
 fi
@@ -103,7 +106,7 @@ if [ "$OS_NAME" = "macOS" ]; then
             RAM="${RAM_GB} GB"
         fi
     fi
-    DISK=$(df -h / | tail -1 | awk '{print "Macintosh HD — " $4 " free of " $2 " (" $3 " used)"}' | sed 's/Gi/ GB/g')
+    DISK=$(df -h / | tail -1 | awk '{print "Macintosh HD - " $4 " free of " $2 " (" $3 " used)"}' | sed 's/Gi/ GB/g')
 else
     if command -v lscpu >/dev/null 2>&1; then
         CPU=$(lscpu | grep 'Model name' | cut -f 2 -d ":" | awk '{$1=$1}1')
@@ -629,17 +632,7 @@ try:
         for line in r.stdout.splitlines():
             if 'VGA' in line or '3D controller' in line or 'Display controller' in line:
                 name = line.split(':', 2)[-1].strip()
-                # Try to get VRAM from sysfs
                 vram = "Unknown"
-                for drm in os.listdir('/sys/class/drm/') if os.path.isdir('/sys/class/drm/') else []:
-                    if drm.startswith('card') and '-' not in drm:
-                        vram_path = f'/sys/class/drm/{drm}/device/mem_info_vram_total'
-                        if os.path.exists(vram_path):
-                            try:
-                                with open(vram_path) as f:
-                                    vram_bytes = int(f.read().strip())
-                                    vram = f"{round(vram_bytes / 1024**2)} MB"
-                            except: pass
                 gpus.append({"name": name, "driver_version": "N/A", "vram": vram})
 except Exception:
     pass
@@ -657,131 +650,105 @@ fi
 echo "Scanning installed software..."
 SOFTWARE_INVENTORY_JSON="[]"
 
-if command -v python3 >/dev/null 2>&1 && [ "$PYTHON3_OK" = "true" ]; then
-    SOFTWARE_INVENTORY_JSON=$(python3 - <<'PYEOF'
+if [ -n "$PYTHON3_CMD" ]; then
+    SOFTWARE_INVENTORY_JSON=$($PYTHON3_CMD - <<PYEOF
+# -*- coding: utf-8 -*-
 import subprocess, json, sys, os
 apps = []
 try:
     if sys.platform == "darwin":
-        # macOS: scan all applications using system_profiler + recursive system walks
-        import plistlib, datetime, subprocess
+        import plistlib, datetime
         seen_paths = set()
         seen_names = set()
 
-        # Method 1: system_profiler SPApplicationsDataType (macOS system registry)
+        # Method 1: system_profiler SPApplicationsDataType -xml (works on macOS 10.11+)
         try:
-            sp = subprocess.run(['system_profiler', 'SPApplicationsDataType', '-json'], capture_output=True, text=True, timeout=15)
-            if sp.returncode == 0 and sp.stdout.strip():
-                sp_data = json.loads(sp.stdout)
-                sp_apps = sp_data.get('SPApplicationsDataType', [])
-                for a in sp_apps:
-                    name = a.get('_name') or 'Unknown'
-                    path = a.get('path') or ''
-                    version = a.get('version') or 'Unknown'
-                    obtained = a.get('obtained_from') or ''
-                    info = a.get('info') or ''
-                    
-                    if path: seen_paths.add(path)
-                    if name != 'Unknown': seen_names.add(name)
-
-                    pub = "Apple Inc." if obtained == "apple" else ("Mac App Store" if obtained == "mac_app_store" else "Third-Party")
-                    if "Google" in info or "Google" in name: pub = "Google LLC"
-                    elif "Microsoft" in info or "Microsoft" in name: pub = "Microsoft Corporation"
-                    elif "Adobe" in info: pub = "Adobe Inc."
-                    elif "Docker" in info: pub = "Docker Inc."
-                    elif "Anysphere" in info or "Cursor" in name: pub = "Anysphere Inc."
-
-                    install_date = "Unknown"
-                    if path and os.path.exists(path):
-                        try:
-                            ctime = os.path.getctime(path)
-                            install_date = datetime.date.fromtimestamp(ctime).isoformat()
-                        except: pass
-
-                    apps.append({
-                        'name': name,
-                        'version': str(version),
-                        'publisher': pub,
-                        'install_date': install_date,
-                        'size_mb': 'System'
-                    })
-        except Exception: pass
-
-        # Method 2: Recursive Walk over /Applications, /System/Applications, ~/Applications, Caskroom
-        search_roots = ['/Applications', '/System/Applications', os.path.expanduser('~/Applications'), '/opt/homebrew/Caskroom', '/usr/local/Caskroom']
-        for sroot in search_roots:
-            if not os.path.isdir(sroot): continue
-            for root, dirs, files in os.walk(sroot):
-                app_dirs = [d for d in dirs if d.endswith('.app')]
-                dirs[:] = [d for d in dirs if not d.endswith('.app')]
-
-                for adir in app_dirs:
-                    app_full = os.path.join(root, adir)
-                    name = adir[:-4]
-                    if app_full in seen_paths or name in seen_names: continue
-                    seen_paths.add(app_full)
-                    seen_names.add(name)
-
-                    version = "Unknown"
-                    pub = "Third-Party"
-                    install_date = "Unknown"
-                    size_mb = "Unknown"
-
+            sp_out = subprocess.check_output(
+                ['system_profiler', 'SPApplicationsDataType', '-xml'],
+                stderr=open(os.devnull, 'w')
+            )
+            if hasattr(plistlib, 'loads'):
+                pl_list = plistlib.loads(sp_out)
+            else:
+                pl_list = plistlib.readPlistFromString(sp_out)
+            sp_apps = pl_list[0].get('_items', []) if pl_list else []
+            for a in sp_apps:
+                name = str(a.get('_name') or 'Unknown')
+                path = str(a.get('path') or '')
+                version = str(a.get('version') or 'Unknown')
+                obtained = str(a.get('obtained_from') or '')
+                if path: seen_paths.add(path)
+                if name != 'Unknown': seen_names.add(name)
+                pub = 'Apple Inc.' if obtained == 'apple' else ('Mac App Store' if obtained == 'mac_app_store' else 'Third-Party')
+                install_date = 'Unknown'
+                if path and os.path.exists(path):
                     try:
-                        ctime = os.path.getctime(app_full)
+                        ctime = os.path.getctime(path)
                         install_date = datetime.date.fromtimestamp(ctime).isoformat()
-                    except: pass
+                    except:
+                        pass
+                apps.append({'name': name, 'version': version, 'publisher': pub, 'install_date': install_date, 'size_mb': 'System'})
+        except Exception:
+            pass
 
-                    plist_path = os.path.join(app_full, 'Contents', 'Info.plist')
-                    if os.path.exists(plist_path):
-                        try:
-                            with open(plist_path, 'rb') as fp:
-                                pl = plistlib.load(fp)
-                                version = pl.get('CFBundleShortVersionString') or pl.get('CFBundleVersion') or 'Unknown'
-                                copyright = str(pl.get('NSHumanReadableCopyright') or '')
-                                bundle_id = str(pl.get('CFBundleIdentifier') or '')
-
-                                if 'apple.' in bundle_id.lower() or 'com.apple' in bundle_id.lower():
-                                    pub = "Apple Inc."
-                                elif 'microsoft' in bundle_id.lower() or 'microsoft' in copyright.lower():
-                                    pub = "Microsoft Corporation"
-                                elif 'google' in bundle_id.lower() or 'google' in copyright.lower():
-                                    pub = "Google LLC"
-                                elif copyright:
-                                    clean_c = copyright.replace('Copyright ©', '').replace('Copyright', '').strip()
-                                    pub = clean_c[:40] if clean_c else "Third-Party"
-                        except: pass
-
-                    apps.append({
-                        'name': name,
-                        'version': str(version),
-                        'publisher': pub,
-                        'install_date': install_date,
-                        'size_mb': size_mb
-                    })
-        if apps:
-            print(json.dumps(apps))
-            sys.exit(0)
+        # Method 2: Walk /Applications for any missed .app bundles
+        for sroot in ['/Applications', os.path.expanduser('~/Applications')]:
+            if not os.path.isdir(sroot):
+                continue
+            for entry in os.listdir(sroot):
+                if not entry.endswith('.app'):
+                    continue
+                app_full = os.path.join(sroot, entry)
+                name = entry[:-4]
+                if app_full in seen_paths or name in seen_names:
+                    continue
+                seen_paths.add(app_full)
+                seen_names.add(name)
+                version = 'Unknown'
+                pub = 'Third-Party'
+                install_date = 'Unknown'
+                try:
+                    ctime = os.path.getctime(app_full)
+                    install_date = datetime.date.fromtimestamp(ctime).isoformat()
+                except:
+                    pass
+                plist_path = os.path.join(app_full, 'Contents', 'Info.plist')
+                if os.path.exists(plist_path):
+                    try:
+                        with open(plist_path, 'rb') as fp:
+                            raw = fp.read()
+                        pl = plistlib.loads(raw) if hasattr(plistlib, 'loads') else plistlib.readPlistFromString(raw)
+                        version = str(pl.get('CFBundleShortVersionString') or pl.get('CFBundleVersion') or 'Unknown')
+                        bundle_id = str(pl.get('CFBundleIdentifier') or '')
+                        if 'com.apple' in bundle_id.lower():
+                            pub = 'Apple Inc.'
+                        elif 'microsoft' in bundle_id.lower():
+                            pub = 'Microsoft Corporation'
+                        elif 'google' in bundle_id.lower():
+                            pub = 'Google LLC'
+                    except:
+                        pass
+                apps.append({'name': name, 'version': version, 'publisher': pub, 'install_date': install_date, 'size_mb': 'Unknown'})
     else:
         # Linux: dpkg-query
-        r = subprocess.run(
-            ['dpkg-query', '-W', '--showformat=${Package}|${Version}|${Installed-Size}\n'],
-            capture_output=True, text=True, timeout=15
-        )
-        for line in r.stdout.strip().split('\n')[:150]:
-            parts = line.split('|')
-            if len(parts) >= 2 and parts[0].strip():
-                size_kb = int(parts[2].strip()) if len(parts) > 2 and parts[2].strip().isdigit() else 0
-                size_str = f"{round(size_kb/1024,2)} MB" if size_kb > 0 else "Unknown"
-                apps.append({'name': parts[0].strip(), 'version': parts[1].strip(), 'publisher': '', 'install_date': 'Unknown', 'size_mb': size_str})
-        if apps:
-            print(json.dumps(apps))
-            sys.exit(0)
+        try:
+            out = subprocess.check_output(
+                ['dpkg-query', '-W', '--showformat=${Package}|${Version}|${Installed-Size}\n'],
+                stderr=open(os.devnull, 'w')
+            )
+            for line in out.decode('utf-8', errors='replace').strip().split('\n')[:150]:
+                parts = line.split('|')
+                if len(parts) >= 2 and parts[0].strip():
+                    size_kb = int(parts[2].strip()) if len(parts) > 2 and parts[2].strip().isdigit() else 0
+                    size_str = str(round(size_kb / 1024.0, 2)) + ' MB' if size_kb > 0 else 'Unknown'
+                    apps.append({'name': parts[0].strip(), 'version': parts[1].strip(), 'publisher': '', 'install_date': 'Unknown', 'size_mb': size_str})
+        except Exception:
+            pass
 except Exception:
     pass
 print(json.dumps(apps))
 PYEOF
-)
+    )
 fi
 echo "Software scan complete."
 
@@ -790,41 +757,41 @@ echo "Software scan complete."
 # ────────────────────────────────────────────────────────────────────────────
 echo "Collecting recent login history..."
 LOGIN_HISTORY_JSON="[]"
-if command -v python3 >/dev/null 2>&1 && [ "$PYTHON3_OK" = "true" ]; then
-    LOGIN_HISTORY_JSON=$(python3 - <<'PYEOF'
-import subprocess, json
+if [ -n "$PYTHON3_CMD" ]; then
+    LOGIN_HISTORY_JSON=$($PYTHON3_CMD - <<PYEOF
+# -*- coding: utf-8 -*-
+import subprocess, json, os
 
 logins = []
 try:
-    r = subprocess.run(['last', '-n', '15'], capture_output=True, text=True, timeout=5)
-    if r.returncode == 0:
-        for line in r.stdout.splitlines():
-            line = line.strip()
-            if not line or line.startswith('wtmp') or line.startswith('utmp') or line.startswith('shutdown'):
-                continue
-            parts = line.split()
-            if len(parts) >= 4:
-                username = parts[0]
-                terminal = parts[1]
-                if username in ['reboot', 'shutdown']:
-                    domain = 'System Event'
-                    logon_type = 'System Startup/Reboot'
-                    timestamp = ' '.join(parts[2:])
-                else:
-                    domain = 'Local / macOS'
-                    logon_type = 'Interactive / Console' if terminal == 'console' else f'TTY Session ({terminal})'
-                    timestamp = ' '.join(parts[2:])
-                
-                logins.append({
-                    "username": username,
-                    "domain": domain,
-                    "logon_type": logon_type,
-                    "timestamp": timestamp
-                })
-except Exception: pass
+    out = subprocess.check_output(['last', '-n', '20'], stderr=open(os.devnull, 'w'))
+    lines = out.decode('utf-8', errors='replace').splitlines()
+    for line in lines:
+        line = line.strip()
+        if not line or line.startswith('wtmp') or line.startswith('utmp') or line.startswith('shutdown'):
+            continue
+        parts = line.split()
+        if len(parts) >= 4:
+            username = parts[0]
+            terminal = parts[1]
+            if username in ['reboot', 'shutdown']:
+                domain = 'System Event'
+                logon_type = 'System Startup/Reboot'
+            else:
+                domain = 'Local / macOS'
+                logon_type = 'Interactive / Console' if terminal == 'console' else 'TTY Session (' + terminal + ')'
+            timestamp = ' '.join(parts[2:])
+            logins.append({
+                'username': username,
+                'domain': domain,
+                'logon_type': logon_type,
+                'timestamp': timestamp
+            })
+except Exception:
+    pass
 print(json.dumps(logins))
 PYEOF
-)
+    )
 fi
 if [ -z "$LOGIN_HISTORY_JSON" ] || [ "$LOGIN_HISTORY_JSON" = "null" ]; then
     LOGIN_HISTORY_JSON="[]"
@@ -833,17 +800,28 @@ fi
 # ────────────────────────────────────────────────────────────────────────────
 #  Build Final JSON Payload — via Python for safe escaping
 # ────────────────────────────────────────────────────────────────────────────
-JSON=$(python3 - <<PYEOF
+if [ "$PYTHON3_OK" != "true" ]; then
+    # python3 not available — attempt python fallback, else build minimal JSON
+    if command -v python >/dev/null 2>&1 && python -c "import json" >/dev/null 2>&1; then
+        PYTHON3_CMD="python"
+    else
+        PYTHON3_CMD=""
+    fi
+else
+    PYTHON3_CMD="python3"
+fi
+
+if [ -n "$PYTHON3_CMD" ]; then
+JSON=$($PYTHON3_CMD - <<PYEOF
+# -*- coding: utf-8 -*-
 import json, sys
 
 def safe(v):
-    """Ensure a value is a non-empty string."""
     if v is None: return "Unknown"
     s = str(v).strip()
     return s if s else "Unknown"
 
 def safe_json(raw, fallback="[]"):
-    """Parse a JSON fragment, returning fallback if invalid."""
     try:
         return json.loads(raw)
     except Exception:
@@ -925,11 +903,25 @@ payload = {
 print(json.dumps(payload))
 PYEOF
 )
+else
+    # Pure-bash minimal JSON fallback — escapes double-quotes only
+    esc() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
+    JSON="{\"execution_datetime\":\"$(esc "$EXECUTION_DATETIME")\",\"consent\":\"$(esc "$CONSENT_TEXT")\",\"computer_name\":\"$(esc "$COMPUTER_NAME")\",\"current_user\":\"$(esc "$USER")\",\"os_name\":\"$(esc "$OS_NAME")\",\"os_version\":\"$(esc "$OS_VERSION")\",\"os_build\":\"Unknown\",\"last_boot\":\"Unknown\",\"uptime\":\"Unknown\",\"architecture\":\"$(esc "$ARCHITECTURE")\",\"license_status\":\"$(esc "$LICENSE_STATUS")\",\"firewall\":\"Unknown\",\"bitlocker\":\"Not Applicable\",\"secure_boot\":\"Unknown\",\"tpm\":\"Not Applicable\",\"hotfixes\":[],\"mac_address\":\"$(esc "$MAC_ADDRESS")\",\"drive_name\":\"No CD Unit Found\",\"compression_utilities\":[\"tar\",\"gzip\"],\"antivirus\":[\"Built-in OS Protections\"],\"printers\":[],\"hardware_details\":{\"cpu\":\"$(esc "$CPU")\",\"ram\":\"$(esc "$RAM")\",\"disk\":\"$(esc "$DISK")\",\"serial_number\":\"$(esc "$SERIAL_NUMBER")\",\"manufacturer\":\"$(esc "$MANUFACTURER")\",\"model\":\"$(esc "$MODEL_NAME")\",\"architecture\":\"$(esc "$ARCHITECTURE")\",\"processor_name\":\"$(esc "$CPU")\",\"installed_ram\":\"$(esc "$RAM")\",\"gpu_details\":[],\"network_adapters\":[],\"peripherals\":[],\"disk_partitions\":[]},\"network_details\":[{\"ip_address\":\"$(esc "$IP_ADDRESS")\",\"gateway\":\"Unknown\",\"mac\":\"$(esc "$MAC_ADDRESS")\"}],\"user_accounts\":[{\"name\":\"$(esc "$USER")\",\"disabled\":\"False\"}],\"software_inventory\":[],\"login_history\":[]}"
+fi
+
+# Server URL & Client ID Resolution
+TARGET_SERVER="${1:-$SERVER_URL}"
+[ -z "$TARGET_SERVER" ] && TARGET_SERVER="http://127.0.0.1:8000"
+TARGET_SERVER="${TARGET_SERVER%/}"
 
 CLIENT_ID="CLIENT_ID_PLACEHOLDER"
-API_URL="http://127.0.0.1:8000/upload-audit?client_id=$CLIENT_ID"
+if [ "$CLIENT_ID" = "CLIENT_ID_PLACEHOLDER" ]; then
+    CLIENT_ID="audit_$(hostname | tr -dc 'a-zA-Z0-9')"
+fi
 
-echo "Uploading secure payload to backend..."
+API_URL="${TARGET_SERVER}/upload-audit?client_id=$CLIENT_ID"
+
+echo "Uploading secure payload to backend ($API_URL)..."
 
 RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$API_URL" \
      -H "Content-Type: application/json" \
@@ -946,5 +938,7 @@ else
     echo "Details: $BODY"
 fi
 
-echo "Press enter to exit..."
-read -r
+if [ -t 0 ]; then
+    echo "Press enter to exit..."
+    read -r
+fi
