@@ -32,8 +32,55 @@ try {
     $uptime = "{0} Days, {1} Hours, {2} Mins" -f $ts.Days, $ts.Hours, $ts.Minutes
 } catch {}
 
+$shutdownTime = "N/A"
+try {
+    $evt = Get-WinEvent -FilterHashtable @{LogName='System'; Id=1074} -MaxEvents 1 -ErrorAction SilentlyContinue
+    if ($evt) { $shutdownTime = $evt.TimeCreated.ToString("yyyy-MM-dd HH:mm:ss") }
+} catch {}
+
+$lastBackup = "No Backup Recorded"
+try {
+    $bkReg = Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsBackup" -ErrorAction SilentlyContinue
+    if ($bkReg -and $bkReg.LastSuccessTime) { $lastBackup = $bkReg.LastSuccessTime.ToString() }
+} catch {}
+
+$lifeCycle = "Active"
+try {
+    if ($os.InstallDate) {
+        $ageDays = ((Get-Date) - $os.InstallDate).Days
+        $years = [math]::Round($ageDays / 365.25, 1)
+        $lifeCycle = "Active ($years Years in Service)"
+    }
+} catch {}
+
 $computer = $env:COMPUTERNAME
 $currentUser = Get-SafeString $env:USERNAME "Unknown"
+
+$domain = "WORKGROUP"
+$domainRole = "Standalone Workstation"
+try {
+    $csObj = Get-CimInstance Win32_ComputerSystem
+    if ($csObj.Domain) { $domain = $csObj.Domain }
+    switch ($csObj.DomainRole) {
+        0 { $domainRole = "Standalone Workstation" }
+        1 { $domainRole = "Member Workstation" }
+        2 { $domainRole = "Standalone Server" }
+        3 { $domainRole = "Member Server" }
+        4 { $domainRole = "Backup Domain Controller" }
+        5 { $domainRole = "Primary Domain Controller" }
+    }
+} catch {}
+
+$osDescription = Get-SafeString $os.Description ""
+if ([string]::IsNullOrWhiteSpace($osDescription) -or $osDescription -eq "N/A") {
+    try {
+        $srvComment = (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters" -Name "srvcomment" -ErrorAction SilentlyContinue).srvcomment
+        if ($srvComment) { $osDescription = $srvComment }
+    } catch {}
+}
+if ([string]::IsNullOrWhiteSpace($osDescription) -or $osDescription -eq "N/A") {
+    $osDescription = "$osName ($architecture) - $domainRole ($domain)"
+}
 
 $licenseStatus = "Unknown"
 try {
@@ -97,13 +144,38 @@ try {
 # ---------------------------------------------------------
 Write-Host "Collecting GPU information..." -ForegroundColor Cyan
 $gpuDetails = @()
+
+# First, try to get precise VRAM from registry to bypass 32-bit AdapterRAM limits (4GB cap)
+$regVramMap = @{}
+try {
+    $regGpus = Get-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}\*' -ErrorAction SilentlyContinue | Where-Object { $_.DriverDesc -ne $null }
+    foreach ($rg in $regGpus) {
+        $vramBytes = $rg.'HardwareInformation.qwMemorySize'
+        if ($null -eq $vramBytes) { $vramBytes = $rg.'HardwareInformation.MemorySize' }
+        if ($vramBytes -is [byte[]]) {
+            if ($vramBytes.Length -eq 8) { $vramBytes = [BitConverter]::ToInt64($vramBytes, 0) }
+            elseif ($vramBytes.Length -eq 4) { $vramBytes = [BitConverter]::ToInt32($vramBytes, 0) }
+        }
+        if ($vramBytes -gt 0) {
+            $regVramMap[$rg.DriverDesc.ToString().Trim()] = $vramBytes
+        }
+    }
+} catch {}
+
 try {
     $gpus = Get-CimInstance Win32_VideoController
     foreach ($g in $gpus) {
         $vram = "Unknown"
-        if ($g.AdapterRAM -gt 0) { $vram = "{0:N2} GB" -f ($g.AdapterRAM / 1GB) }
+        $gName = Get-SafeString $g.Name
+        
+        if ($regVramMap.ContainsKey($gName)) {
+            $vram = "{0:N2} GB" -f ($regVramMap[$gName] / 1GB)
+        } elseif ($g.AdapterRAM -gt 0) {
+            $vram = "{0:N2} GB" -f ($g.AdapterRAM / 1GB)
+        }
+        
         $gpuDetails += @{
-            name           = Get-SafeString $g.Name
+            name           = $gName
             driver_version = Get-SafeString $g.DriverVersion
             vram           = $vram
         }
@@ -196,11 +268,16 @@ try {
 
 try {
     $adapters = Get-CimInstance Win32_NetworkAdapterConfiguration | Where-Object { $_.IPEnabled -eq $true }
+    $netIf = Get-NetIPInterface -AddressFamily IPv4 -ErrorAction SilentlyContinue | Where-Object ConnectionState -eq 'Connected' | Select-Object -First 1
+    $mtuVal = if ($netIf -and $netIf.NlMtu) { "$($netIf.NlMtu) Bytes" } else { "1500 (Standard)" }
+
     foreach ($a in $adapters) {
         if ($mac -eq "Unknown" -and $a.MACAddress) { $mac = $a.MACAddress }
         $ip4 = ($a.IPAddress | Where-Object { $_ -match "\." }) -join ", "
         $ip6 = ($a.IPAddress | Where-Object { $_ -match ":" }) -join ", "
         $gw = ($a.DefaultIPGateway) -join ", "
+        $subnetMask = ($a.IPSubnet | Where-Object { $_ -match "\." }) -join ", "
+
         $networkAdapters += @{
             name             = Get-SafeString $a.Description
             adapter_type     = "Ethernet / Wi-Fi"
@@ -209,6 +286,8 @@ try {
             ipv4             = Get-SafeString $ip4
             ipv6             = Get-SafeString $ip6
             gateway          = Get-SafeString $gw
+            subnet_mask      = Get-SafeString $subnetMask "255.255.255.0"
+            mtu              = $mtuVal
             dns_servers      = Get-SafeString $dnsServers
             wifi_ssid        = Get-SafeString $wifiSsid
         }
@@ -218,12 +297,17 @@ try {
 # ---------------------------------------------------------
 # Geolocation & Public IP Info
 # ---------------------------------------------------------
-Write-Host "Collecting location & network IP info..." -ForegroundColor Cyan
-$locationInfo = "Unknown"
+Write-Host "Collecting location information..." -ForegroundColor Cyan
+$locationInfo = "Location Unavailable"
 try {
-    $geo = Invoke-RestMethod -Uri "http://ip-api.com/json/" -TimeoutSec 5 -ErrorAction SilentlyContinue
+    $geo = Invoke-RestMethod -Uri "http://ip-api.com/json/" -UserAgent "Mozilla/5.0" -TimeoutSec 5 -ErrorAction SilentlyContinue
     if ($geo -and $geo.status -eq "success") {
         $locationInfo = "$($geo.city), $($geo.regionName), $($geo.country) (Lat: $($geo.lat), Lon: $($geo.lon) | Public IP: $($geo.query))"
+    } else {
+        $geo2 = Invoke-RestMethod -Uri "https://ipinfo.io/json" -UserAgent "Mozilla/5.0" -TimeoutSec 5 -ErrorAction SilentlyContinue
+        if ($geo2 -and $geo2.city) {
+            $locationInfo = "$($geo2.city), $($geo2.region), $($geo2.country) (Public IP: $($geo2.ip))"
+        }
     }
 } catch {
     $locationInfo = "Location Unavailable"
@@ -416,6 +500,12 @@ $data = @{
     consent               = $consentText
     computer_name         = $computer
     current_user          = $currentUser
+    description           = $osDescription
+    domain                = $domain
+    domain_role           = $domainRole
+    shutdown_time         = $shutdownTime
+    last_backup           = $lastBackup
+    life_cycle            = $lifeCycle
     
     os_name               = $osName
     os_version            = $osVersion
@@ -441,6 +531,13 @@ $data = @{
         cpu               = $processorName
         ram               = $ramTotalStr
         disk              = $diskSummaryStr
+        
+        description       = $osDescription
+        domain            = $domain
+        domain_role       = $domainRole
+        shutdown_time     = $shutdownTime
+        last_backup       = $lastBackup
+        life_cycle        = $lifeCycle
         
         device_name       = $computer
         manufacturer      = $manufacturer

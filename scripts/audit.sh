@@ -27,6 +27,18 @@ elif [ -f /etc/os-release ]; then
 fi
 
 LICENSE_STATUS="Not Applicable"
+DESCRIPTION="Unix Workstation ($OS_NAME)"
+DOMAIN="LOCAL"
+DOMAIN_ROLE="Standalone Workstation"
+SHUTDOWN_TIME="N/A"
+LAST_BACKUP="TimeMachine / System Backup Active"
+LIFE_CYCLE="Active"
+
+# Extract shutdown time if available
+if command -v last >/dev/null 2>&1; then
+    SHUTDOWN_TIME=$(last -x shutdown 2>/dev/null | head -1 | awk '{print $4" "$5" "$6" "$7}')
+    [ -z "$SHUTDOWN_TIME" ] && SHUTDOWN_TIME="N/A"
+fi
 
 # Check if python3 is usable without triggering xcode-select installer
 # On macOS without Xcode CLT, invoking python3 pops up an install dialog
@@ -635,6 +647,12 @@ hw = {
     "manufacturer":     safe("""$MANUFACTURER"""),
     "model":            safe("""$MODEL_NAME"""),
     "serial_number":    safe("""$SERIAL_NUMBER"""),
+    "description":      safe("""$DESCRIPTION"""),
+    "domain":           safe("""$DOMAIN"""),
+    "domain_role":      safe("""$DOMAIN_ROLE"""),
+    "shutdown_time":    safe("""$SHUTDOWN_TIME"""),
+    "last_backup":      safe("""$LAST_BACKUP"""),
+    "life_cycle":       safe("""$LIFE_CYCLE"""),
     "asset_tag":        "N/A",
     "device_type":      "Laptop",
     "architecture":     safe("""$ARCHITECTURE"""),
@@ -665,6 +683,12 @@ payload = {
     "execution_datetime":    safe("""$EXECUTION_DATETIME"""),
     "consent":               """$CONSENT_TEXT""",
     "computer_name":         safe("""$COMPUTER_NAME"""),
+    "description":           safe("""$DESCRIPTION"""),
+    "domain":                safe("""$DOMAIN"""),
+    "domain_role":           safe("""$DOMAIN_ROLE"""),
+    "shutdown_time":         safe("""$SHUTDOWN_TIME"""),
+    "last_backup":           safe("""$LAST_BACKUP"""),
+    "life_cycle":            safe("""$LIFE_CYCLE"""),
     "os_name":               safe("""$OS_NAME"""),
     "os_version":            safe("""$OS_VERSION"""),
     "os_build":              "Unknown",

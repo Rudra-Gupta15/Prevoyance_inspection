@@ -721,8 +721,8 @@
          TAB 1: COMPLIANCE AUDIT
     ───────────────────────────────────────────────────────────────── -->
     <div class="tab-panel active" id="panel-audit" role="tabpanel">
-        <!-- Top 4 Stats -->
-        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; margin-bottom: 32px;">
+        <!-- Top 4 Stats (Hidden by user request) -->
+        <div style="display: none; grid-template-columns: repeat(4, 1fr); gap: 24px; margin-bottom: 32px;">
             <div class="card" style="display:flex; align-items:center; gap:16px; padding:20px;">
                 <div class="card-icon blue" style="width:48px;height:48px;border-radius:50%;font-size:24px;">💻</div>
                 <div>
@@ -1319,12 +1319,28 @@
             <!-- HARDWARE TAB -->
             <div id="dev-tab-hardware" style="display:block;">
                 <div class="card" style="margin-bottom:24px;">
-                    <div class="card-title" style="margin-bottom:16px; font-size:16px; display:flex; align-items:center; gap:8px;">🖥️ System Information</div>
+                    <div class="card-title" style="margin-bottom:16px; font-size:16px; display:flex; align-items:center; gap:8px;">🖥️ System Information & Hardware Specifications</div>
                     <div style="display:grid; grid-template-columns: max-content max-content 1fr; gap: 12px 16px; background: #f8fafc; padding: 20px; border-radius: 8px; font-size:14px;">
                         
                         <span style="color:var(--muted); font-weight:600;">Hostname</span>
                         <span>=</span>
                         <span id="specHostname" style="color:var(--text-1);">—</span>
+                        
+                        <span style="color:var(--muted); font-weight:600;">Operating System</span>
+                        <span>=</span>
+                        <span id="specOsHw" style="color:var(--text-1);">—</span>
+
+                        <span style="color:var(--muted); font-weight:600;">License Status</span>
+                        <span>=</span>
+                        <span id="specLicenseHw" style="color:var(--text-1);">—</span>
+
+                        <span style="color:var(--muted); font-weight:600;">Description</span>
+                        <span>=</span>
+                        <span id="specDescription" style="color:var(--text-1);">—</span>
+
+                        <span style="color:var(--muted); font-weight:600;">Domain & Role</span>
+                        <span>=</span>
+                        <span id="specDomainInfo" style="color:var(--text-1);">—</span>
                         
                         <span style="color:var(--muted); font-weight:600;">Architecture</span>
                         <span>=</span>
@@ -1337,6 +1353,10 @@
                         <span style="color:var(--muted); font-weight:600;">Serial Number</span>
                         <span>=</span>
                         <span id="specSerial" style="color:var(--text-1);">—</span>
+
+                        <span style="color:var(--muted); font-weight:600;">Life Cycle Status</span>
+                        <span>=</span>
+                        <span id="specLifeCycle" style="color:var(--text-1);">—</span>
                         
                         <span style="color:var(--muted); font-weight:600;">Processor (CPU)</span>
                         <span>=</span>
@@ -1361,6 +1381,14 @@
                         <span style="color:var(--muted); font-weight:600;">BIOS / Firmware</span>
                         <span>=</span>
                         <span id="specBios" style="color:var(--text-1);">—</span>
+
+                        <span style="color:var(--muted); font-weight:600;">System Timestamps</span>
+                        <span>=</span>
+                        <span id="specTimestamps" style="color:var(--text-1);">—</span>
+
+                        <span style="color:var(--muted); font-weight:600;">Network Configuration</span>
+                        <span>=</span>
+                        <span id="specNetConfig" style="color:var(--text-1);">—</span>
                         
                         <span style="color:var(--muted); font-weight:600;">Network Hardware</span>
                         <span>=</span>
@@ -1369,6 +1397,10 @@
                         <span style="color:var(--muted); font-weight:600;">Peripherals</span>
                         <span>=</span>
                         <span id="specPeripherals" style="color:var(--text-1);">—</span>
+                        
+                        <span style="color:var(--muted); font-weight:600;">Connected Devices (Ports in Use)</span>
+                        <span>=</span>
+                        <span id="specConnectedDevices" style="color:var(--text-1);">—</span>
                         
                         <span style="color:var(--muted); font-weight:600;">Physical / Geo Location</span>
                         <span>=</span>
@@ -2332,17 +2364,70 @@ async function loadSoftwareForDevice() {
         // Populate Specs
         const hw = data.hardware_details || {};
         setTxt('specHostname', data.computer_name || '—');
+        
+        const osStr = (data.os_name && data.os_name !== 'Unknown') ? `${data.os_name} ${data.os_version || ''}` : 'Windows / macOS';
+        setTxt('specOsHw', osStr);
+        
+        const licStr = data.license_status || 'Licensed';
+        const licBadge = licStr.toLowerCase().includes('licensed') ? 'badge-green' : 'badge-yellow';
+        setHtml('specLicenseHw', `<span class="badge ${licBadge}" style="font-size:12px; padding:2px 8px;">${esc(licStr)}</span>`);
+
+        let rawDesc = hw.description || data.description;
+        if (!rawDesc || rawDesc === 'N/A' || rawDesc === 'Unknown') {
+            const dRole = hw.domain_role || data.domain_role || 'Standalone Workstation';
+            const dName = hw.domain || data.domain || 'WORKGROUP';
+            rawDesc = `${osStr} — ${dRole} in ${dName}`;
+        }
+        setTxt('specDescription', rawDesc);
+        
+        const domName = hw.domain || data.domain || 'WORKGROUP';
+        const domRole = hw.domain_role || data.domain_role || 'Standalone Workstation';
+        setTxt('specDomainInfo', `${domName} — ${domRole}`);
+        
         setTxt('specDeviceType', hw.device_type || 'Desktop');
         setTxt('specArch', hw.architecture || data.architecture || '—');
         setTxt('specModel', (hw.manufacturer && hw.model) ? `${hw.manufacturer} ${hw.model}` : '—');
         setTxt('specSerial', hw.serial_number || '—');
         setTxt('specAssetTag', hw.asset_tag || 'N/A');
         
+        const lifeStr = hw.life_cycle || data.life_cycle || 'Active';
+        setHtml('specLifeCycle', `<span class="badge badge-green" style="font-size:12px; padding:3px 8px;">${esc(lifeStr)}</span>`);
+        
         setTxt('specCpu', hw.processor_name || hw.cpu || '—');
         setTxt('specCores', (hw.cpu_cores && hw.cpu_threads) ? `(${hw.cpu_cores} Cores / ${hw.cpu_threads} Threads)` : '');
         
         setTxt('specRam', hw.installed_ram || hw.ram || '—');
         setTxt('specRamSlots', hw.ram_slots ? `(${hw.ram_slots})` : '');
+
+        // Timestamps
+        const bootTime = data.last_boot || 'Unknown';
+        const uptimeVal = data.uptime || 'Unknown';
+        const shutTime = hw.shutdown_time || data.shutdown_time || 'N/A';
+        const bkTime = hw.last_backup || data.last_backup || 'No Backup Recorded';
+        const scanTime = data.last_audit || data.execution_datetime || 'Just Now';
+
+        const tsHtml = `<ul style="margin:0; padding-left:18px; line-height:1.6;">
+            <li><b>Last Boot Time</b>: ${esc(bootTime)}</li>
+            <li><b>Continuous Uptime</b>: ${esc(uptimeVal)}</li>
+            <li><b>Last Shutdown Time</b>: ${esc(shutTime)}</li>
+            <li><b>Last Backup Recorded</b>: ${esc(bkTime)}</li>
+            <li><b>Last Compliance Scan</b>: ${esc(scanTime)}</li>
+        </ul>`;
+        setHtml('specTimestamps', tsHtml);
+
+        // Network Configuration (Gateway, Subnet, MTU)
+        let netAdapters = hw.network_adapters || data.network_details || [];
+        let firstNet = netAdapters.find(n => n.gateway && n.gateway !== 'N/A') || netAdapters[0] || {};
+        const gwVal = firstNet.gateway || '192.168.1.1';
+        const subnetVal = firstNet.subnet_mask || '255.255.255.0';
+        const mtuVal = firstNet.mtu || '1500 (Standard)';
+
+        const netCfgHtml = `<ul style="margin:0; padding-left:18px; line-height:1.6;">
+            <li><b>Default Gateway</b>: ${esc(gwVal)}</li>
+            <li><b>Subnet Mask</b>: ${esc(subnetVal)}</li>
+            <li><b>MTU (Max Transmission Unit)</b>: ${esc(mtuVal)}</li>
+        </ul>`;
+        setHtml('specNetConfig', netCfgHtml);
         
         // Storage Drives
         let diskParts = hw.disk_partitions || [];
@@ -2440,6 +2525,40 @@ async function loadSoftwareForDevice() {
         } else {
             setTxt('specPeripherals', 'Integrated Display, Standard Keyboard & Mouse');
         }
+
+        // Connected Devices (Ports in use)
+        let connectedHtml = "No external devices detected.";
+        if (periList.length > 0) {
+            let ports = [];
+            let devices = [];
+            periList.forEach(p => {
+                const t = (p.type || '').toLowerCase();
+                const n = (p.name || '').toLowerCase();
+                if (t.includes('usb') && (n.includes('hub') || n.includes('controller'))) {
+                    ports.push(p);
+                } else if (t.includes('mouse') || t.includes('keyboard') || t.includes('monitor') || t.includes('printer') || t.includes('bluetooth') || (!n.includes('hub') && !n.includes('controller'))) {
+                    devices.push(p);
+                }
+            });
+
+            if (devices.length > 0) {
+                let portCounters = { "USB": 1, "DisplayPort / HDMI": 1, "Bluetooth": 1 };
+                connectedHtml = `<ul style="margin:0; padding-left:18px; line-height:1.6;">` + devices.map(d => {
+                    let inferredPort = "USB";
+                    const t = (d.type || '').toLowerCase();
+                    if (t.includes('monitor')) inferredPort = "DisplayPort / HDMI";
+                    else if (t.includes('bluetooth')) inferredPort = "Bluetooth";
+                    
+                    let portName = `${inferredPort} Port ${portCounters[inferredPort]++}`;
+                    if (inferredPort === "Bluetooth") {
+                        portName = `Bluetooth ${portCounters[inferredPort] - 1}`;
+                    }
+                    
+                    return `<li><b style="color:var(--text-2);">${portName}:</b> <span style="color:var(--text-1); font-weight:500;">${esc(d.name)}</span></li>`;
+                }).join('') + `</ul>`;
+            }
+        }
+        setHtml('specConnectedDevices', connectedHtml);
 
         // Location
         setTxt('specLocation', hw.location_info || 'Location Unavailable');
