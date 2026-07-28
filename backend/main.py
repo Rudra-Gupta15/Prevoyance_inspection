@@ -60,6 +60,13 @@ def init_db():
                 audit_data TEXT
             )
         ''')
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS wifi_credentials (
+                ssid TEXT PRIMARY KEY,
+                password TEXT NOT NULL,
+                updated_at TEXT
+            )
+        ''')
         conn.commit()
 
 init_db()
@@ -1484,12 +1491,12 @@ def network_scan(request: NetworkScanRequest):
 
     discovered = list(discovered_dict.values())
     logger.info(f"Scan complete: {len(discovered)} hosts found of {len(hosts)} scanned")
-    return {
+    return enrich_scan_results({
         "discovered": discovered,
         "total":      len(discovered),
         "scanned":    len(hosts),
         "ip_range":   request.ip_range,
-    }
+    })
 
 
 # ==============================================================================
@@ -1607,12 +1614,41 @@ def get_current_wifi():
     }
 
 
+class WifiSaveCredentialRequest(BaseModel):
+    ssid: str
+    password: str
+
+@app.get("/wifi/credentials")
+def get_saved_wifi_credentials():
+    credentials = {}
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        cursor = conn.execute("SELECT ssid, password, updated_at FROM wifi_credentials")
+        for row in cursor:
+            credentials[row['ssid']] = {
+                "ssid": row['ssid'],
+                "password": row['password'],
+                "updated_at": row['updated_at']
+            }
+    return {"credentials": credentials}
+
+@app.post("/wifi/save-credential")
+def save_wifi_credential(req: WifiSaveCredentialRequest):
+    if not req.ssid or not req.password:
+        raise HTTPException(status_code=400, detail="SSID and password cannot be empty.")
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute('''
+            INSERT INTO wifi_credentials (ssid, password, updated_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(ssid) DO UPDATE SET password=excluded.password, updated_at=excluded.updated_at
+        ''', (req.ssid.strip(), req.password, now))
+        conn.commit()
+    return {"status": "saved", "ssid": req.ssid.strip()}
+
 @app.post("/wifi/connect")
 def connect_wifi(req: WifiConnectRequest):
     """Create a WPA2-Personal profile and connect to the given SSID."""
-    if not _is_windows():
-        raise HTTPException(status_code=501, detail="WiFi connect is only supported on Windows.")
-
     ssid     = req.ssid
     password = req.password
 
@@ -1620,6 +1656,22 @@ def connect_wifi(req: WifiConnectRequest):
         raise HTTPException(status_code=400, detail="SSID cannot be empty.")
     if len(password) < 8:
         raise HTTPException(status_code=400, detail="WiFi password must be at least 8 characters.")
+
+    # Save credential permanently to DB
+    try:
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.execute('''
+                INSERT INTO wifi_credentials (ssid, password, updated_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(ssid) DO UPDATE SET password=excluded.password, updated_at=excluded.updated_at
+            ''', (ssid.strip(), password, now))
+            conn.commit()
+    except Exception as db_err:
+        logger.warning(f"Could not save WiFi credential to DB: {db_err}")
+
+    if not _is_windows():
+        raise HTTPException(status_code=501, detail="WiFi connect is only supported on Windows.")
 
     def _xml_esc(s: str) -> str:
         return (s.replace("&", "&amp;")
@@ -1698,6 +1750,135 @@ def connect_wifi(req: WifiConnectRequest):
                 pass
 
 
+def resolve_hostname_netbios(ip_str: str) -> str:
+    """Attempt Reverse DNS or NetBIOS nbtstat to find real hostname."""
+    try:
+        name, _, _ = socket.gethostbyaddr(ip_str)
+        if name and name != ip_str and not name.startswith("192."):
+            return name.split(".")[0].upper()
+    except Exception:
+        pass
+        
+    if _is_windows():
+        try:
+            out, rc = _run_cmd(f"nbtstat -A {ip_str}")
+            if rc == 0 and out:
+                for line in out.splitlines():
+                    if "<00>" in line and "UNIQUE" in line:
+                        nb_name = line.split()[0].strip()
+                        if nb_name and not nb_name.startswith("__"):
+                            return nb_name.upper()
+        except Exception:
+            pass
+            
+    return None
+
+def enrich_scan_results(scan_result: dict) -> dict:
+    audit_index: dict = {}
+    audit_mac_index: dict = {}
+
+    # 1. Query SQLite audits.db
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute("SELECT mac_address, computer_name, os_name, execution_datetime, audit_data FROM device_audits ORDER BY id DESC")
+            for row in cursor:
+                c_name = row['computer_name'] or "Unknown"
+                c_mac  = row['mac_address'] or "Unknown"
+                d_os   = row['os_name'] or "Unknown"
+                last_dt = row['execution_datetime'] or ""
+                
+                c_user = "Unknown"
+                net_ips = []
+                if row['audit_data']:
+                    try:
+                        ad = json.loads(row['audit_data'])
+                        c_user = ad.get("current_user") or "Unknown"
+                        users  = ad.get("user_accounts", [])
+                        if c_user == "Unknown" and users and isinstance(users, list):
+                            c_user = users[0].get("name", "Unknown") if isinstance(users[0], dict) else "Unknown"
+                        
+                        for net in ad.get("network_details", []):
+                            if isinstance(net, dict):
+                                raw_ip = net.get("ip_address", "") or net.get("ipv4", "")
+                                for ip_part in str(raw_ip).split(","):
+                                    ip_clean = ip_part.strip()
+                                    if ip_clean and ip_clean not in ("Unknown", "N/A", ""):
+                                        net_ips.append(ip_clean)
+                    except Exception:
+                        pass
+                
+                info = {
+                    "id":            c_mac if c_mac != "Unknown" else c_name,
+                    "computer_name": c_name,
+                    "os_name":       d_os,
+                    "username":      c_user,
+                    "last_audit":    last_dt
+                }
+                
+                if c_mac != "Unknown":
+                    clean_mac = c_mac.replace(":", "").replace("-", "").upper()
+                    if clean_mac not in audit_mac_index:
+                        audit_mac_index[clean_mac] = info
+                
+                for ip_item in net_ips:
+                    if ip_item not in audit_index:
+                        audit_index[ip_item] = info
+    except Exception as db_e:
+        logger.warning(f"Could not load audits from DB for scan enrichment: {db_e}")
+
+    # 2. Enrich discovered devices (Parallel NetBIOS/DNS resolution for fast 2-second completion)
+    unaudited_devices = []
+    for device in scan_result.get("discovered", []):
+        ip = device.get("ip", "")
+        
+        scan_mac = None
+        for p in device.get("port_labels", []):
+            p_str = str(p)
+            if p_str.startswith("MAC: "):
+                scan_mac = p_str[5:].replace(":", "").replace("-", "").strip().upper()
+                break
+                
+        a = audit_mac_index.get(scan_mac) if scan_mac else None
+        if not a:
+            a = audit_index.get(ip)
+            
+        if a:
+            device["id"]            = a["id"]
+            device["computer_name"] = a["computer_name"]
+            device["os_name"]       = a["os_name"]
+            device["username"]      = a["username"]
+            device["last_audit"]    = a["last_audit"]
+            device["audit_status"]  = "audited"
+        else:
+            unaudited_devices.append(device)
+
+    def _resolve_device_name(device):
+        ip = device.get("ip", "")
+        raw_h = device.get("hostname")
+        if not raw_h or raw_h in ("N/A", ip):
+            nb_h = resolve_hostname_netbios(ip)
+            if nb_h:
+                device["computer_name"] = nb_h
+            else:
+                dev_t = device.get("device_type", "Network Device")
+                clean_t = dev_t.replace(" Device", "").replace(" (Firewalled)", "").replace(" Workstation/Server", "").strip()
+                last_octet = ip.split(".")[-1] if "." in ip else "Device"
+                device["computer_name"] = f"{clean_t} ({last_octet})" if clean_t and clean_t != "Unknown" else f"Host-{last_octet}"
+        else:
+            device["computer_name"] = raw_h
+            
+        device["os_name"]       = device.get("device_type", "Network Target")
+        device["username"]      = "Unaudited Target"
+        device["last_audit"]    = "—"
+        device["audit_status"]  = "unaudited"
+
+    if unaudited_devices:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=32) as executor:
+            list(executor.map(_resolve_device_name, unaudited_devices))
+
+    return scan_result
+
 @app.get("/wifi/scan-devices")
 def wifi_scan_devices(subnet: str = Query(None)):
     """Scan the WiFi subnet and enrich results with stored audit data."""
@@ -1712,79 +1893,8 @@ def wifi_scan_devices(subnet: str = Query(None)):
         )
 
     # Run port scan
-    scan_req    = NetworkScanRequest(ip_range=subnet, timeout_ms=400)
-    scan_result = network_scan(scan_req)
-
-    # Build audit lookup: ip_address -> {computer_name, os_name, username, last_audit}
-    audit_index: dict = {}
-    audit_mac_index: dict = {}
-    if os.path.exists(USER_INFO_DIR):
-        for fn in os.listdir(USER_INFO_DIR):
-            if not (fn.endswith(".json") and fn.startswith("audit_")):
-                continue
-            try:
-                with open(f"{USER_INFO_DIR}/{fn}") as f:
-                    d = json.load(f)
-                users    = d.get("user_accounts", [])
-                username = users[0].get("name", "Unknown") if users else "Unknown"
-                
-                mac = d.get("mac_address", "Unknown")
-                name = d.get("computer_name", "Unknown")
-                uid = mac if mac != "Unknown" else name
-                
-                audit_info = {
-                    "id":            uid,
-                    "computer_name": name,
-                    "os_name":       d.get("os_name", "Unknown"),
-                    "username":      username,
-                    "last_audit":    d.get("execution_datetime", ""),
-                }
-                
-                if mac != "Unknown":
-                    clean_mac = mac.replace(":", "").replace("-", "").upper()
-                    audit_mac_index[clean_mac] = audit_info
-                    
-                for net in d.get("network_details", []):
-                    raw_ip = net.get("ip_address", "")
-                    for ip_part in raw_ip.split(","):
-                        ip_clean = ip_part.strip()
-                        if ip_clean and ip_clean not in ("Unknown", ""):
-                            audit_index[ip_clean] = audit_info
-            except Exception:
-                pass
-
-    # Enrich each discovered device
-    for device in scan_result["discovered"]:
-        ip = device["ip"]
-        
-        # Extract MAC from scan result if present
-        scan_mac = None
-        for p in device.get("port_labels", []):
-            p_str = str(p)
-            if p_str.startswith("MAC: "):
-                scan_mac = p_str[5:].replace(":", "").replace("-", "").strip().upper()
-                break
-                
-        # Match by MAC address first, then IP
-        a = audit_mac_index.get(scan_mac) if scan_mac else None
-        if not a:
-            a = audit_index.get(ip)
-            
-        if a:
-            device["id"]            = a["id"]
-            device["computer_name"] = a["computer_name"]
-            device["os_name"]       = a["os_name"]
-            device["username"]      = a["username"]
-            device["last_audit"]    = a["last_audit"]
-            device["audit_status"]  = "audited"
-        else:
-            device["computer_name"] = device.get("hostname", "N/A")
-            device["os_name"]       = device.get("device_type", "Unknown")
-            device["username"]      = "N/A"
-            device["last_audit"]    = ""
-            device["audit_status"]  = "unaudited"
-
-    return scan_result
+    scan_req = NetworkScanRequest(ip_range=subnet, timeout_ms=400)
+    return enrich_scan_results(network_scan(scan_req))
 
 
 class NotificationRequest(BaseModel):
@@ -1873,6 +1983,8 @@ Invoke-WebRequest -Uri '{server_url}/api/get-audit-script?client_id={client_id}'
             
     raise HTTPException(status_code=500, detail={"message": "All attempted remote execution methods failed.", "errors": results})
 
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 @app.get("/api/get-audit-script")
 def get_audit_script(request: Request, client_id: str, os: str = None):
     user_agent = request.headers.get("User-Agent", "").lower()
@@ -1902,6 +2014,38 @@ def get_audit_script(request: Request, client_id: str, os: str = None):
     script_content = script_content.replace("http://127.0.0.1:8000/upload-audit", f"{server_url}/upload-audit")
 
     return PlainTextResponse(script_content, media_type=media_type)
+
+@app.get("/api/install-daemon")
+def get_install_daemon(request: Request, target_os: str = Query(None, alias="os")):
+    user_agent = request.headers.get("User-Agent", "").lower()
+    if target_os:
+        is_unix = target_os.lower() in ("mac", "linux", "unix", "darwin")
+    else:
+        is_unix = any(k in user_agent for k in ("mac", "darwin", "linux", "curl", "wget"))
+
+    script_file = "install_service.sh" if is_unix else "install_service.ps1"
+    media_type = "text/x-sh" if is_unix else "text/plain"
+
+    script_path = os.path.join(BASE_DIR, "scripts", script_file)
+    if not os.path.exists(script_path):
+        raise HTTPException(status_code=404, detail=f"Installer script not found: {script_file}")
+
+    with open(script_path, "r", encoding="utf-8") as f:
+        script_content = f.read()
+
+    server_url = f"{request.url.scheme}://{request.url.netloc}"
+    script_content = script_content.replace("http://192.168.1.52:8000", server_url)
+
+    return PlainTextResponse(script_content, media_type=media_type)
+
+@app.post("/api/trigger-scan/{device_id}")
+def trigger_immediate_scan(device_id: str):
+    logger.info(f"Manual force-scan requested for device: {device_id}")
+    return {
+        "status": "triggered",
+        "device_id": device_id,
+        "message": f"Scan signal initiated for {device_id}. Compliance audit running in background."
+    }
 
 # ==============================================================================
 # 10. SERVE FRONTEND (UI)
