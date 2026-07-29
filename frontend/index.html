@@ -2449,10 +2449,14 @@
                                 document.getElementById('scanStatus').style.display = 'block';
                                 document.getElementById('scanResults').style.display = 'block';
 
-                                const tbody = document.getElementById('scanTableBody');
+                                const tbody1 = document.getElementById('scanTableBody');
+                                const tbody2 = document.getElementById('wifiDevicesTableBody');
                                 const summary = document.getElementById('scanSummary');
-                                tbody.innerHTML = '';
+                                
+                                if (tbody1) tbody1.innerHTML = '';
+                                if (tbody2) tbody2.innerHTML = '';
                                 scanData = [];
+                                wifiDeviceData = [];
                                 let count = 0;
 
                                 summary.innerHTML = `<span style="display:inline-flex; align-items:center; gap:8px;"><span class="status-dot warning pulse"></span> Live Scanning <b>${esc(ipRange)}</b> — Discovered devices will pop up below in real-time… (<b id="liveCount">0</b> found)</span>`;
@@ -2492,6 +2496,7 @@
                                                     if (event.type === 'device' && event.device) {
                                                         const d = event.device;
                                                         scanData.push(d);
+                                                        wifiDeviceData.push(d);
                                                         count++;
                                                         const liveCountEl = document.getElementById('liveCount');
                                                         if (liveCountEl) liveCountEl.textContent = count;
@@ -2499,6 +2504,8 @@
                                                         appendDiscoveredDeviceRow(d, ipRange);
                                                     } else if (event.type === 'complete') {
                                                         summary.innerHTML = `✅ <b>Scan Complete</b>: Discovered <b>${event.total}</b> live device${event.total !== 1 ? 's' : ''} out of <b>${event.scanned || 254}</b> hosts scanned in <b>${esc(ipRange)}</b>.`;
+                                                        const wifiMeta = document.getElementById('wifiScanMeta');
+                                                        if (wifiMeta) wifiMeta.textContent = `${event.total} devices on ${ipRange}`;
                                                         setGlobalStatus('ok', `Found ${event.total} devices`);
                                                     }
                                                 } catch (e) {
@@ -2509,11 +2516,8 @@
                                     }
 
                                     if (scanData.length === 0) {
-                                        tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state">
-                                            <div class="empty-icon">📡</div>
-                                            <h3>No devices found</h3>
-                                            <p>No live hosts detected in the scanned range (${esc(ipRange)}). Try a longer timeout or different range.</p>
-                                        </div></td></tr>`;
+                                        if (tbody1) tbody1.innerHTML = `<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">📡</div><h3>No devices found</h3><p>No live hosts detected in ${esc(ipRange)}.</p></div></td></tr>`;
+                                        if (tbody2) tbody2.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">📡</div><h3>No devices found</h3><p>No live hosts detected in ${esc(ipRange)}.</p></div></td></tr>`;
                                         summary.textContent = `No devices found in ${ipRange}`;
                                     }
                                 } catch (e) {
@@ -2527,22 +2531,81 @@
                             }
 
                             function appendDiscoveredDeviceRow(d, ipRange) {
-                                const tbody = document.getElementById('scanTableBody');
-                                const tr = document.createElement('tr');
-                                tr.style.animation = 'popIn 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards';
-                                tr.innerHTML = `
-                                    <td><b class="td-mono">${esc(d.ip)}</b></td>
-                                    <td style="color:var(--text-2); font-weight:500;">${esc(d.computer_name || d.hostname || 'N/A')}</td>
-                                    <td><span class="badge badge-purple" style="font-size:11px; font-weight:600;">${esc(ipRange)}</span></td>
-                                    <td>${(d.port_labels || []).map(p => `<span class="port-tag">${esc(p)}</span>`).join(' ')}</td>
-                                    <td><span class="badge badge-blue">${esc(d.device_type)}</span></td>
-                                    <td>
-                                        <button class="btn btn-outline btn-sm" onclick="registerDiscoveredAsset('${esc(d.ip)}','${esc(d.computer_name || d.hostname)}','${esc(d.device_type)}')">
-                                            ➕ Register
-                                        </button>
-                                    </td>
-                                `;
-                                tbody.appendChild(tr);
+                                // 1. Render in Info Gathering Table
+                                const tbody1 = document.getElementById('scanTableBody');
+                                if (tbody1) {
+                                    const tr1 = document.createElement('tr');
+                                    tr1.className = 'scan-result-enter';
+                                    tr1.style.animation = 'popIn 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards';
+                                    tr1.innerHTML = `
+                                        <td><b class="td-mono">${esc(d.ip)}</b></td>
+                                        <td style="color:var(--text-2); font-weight:500;">${esc(d.computer_name || d.hostname || 'N/A')}</td>
+                                        <td><span class="badge badge-purple" style="font-size:11px; font-weight:600;">${esc(ipRange)}</span></td>
+                                        <td>${(d.port_labels || []).map(p => `<span class="port-tag">${esc(p)}</span>`).join(' ')}</td>
+                                        <td><span class="badge badge-blue">${esc(d.device_type)}</span></td>
+                                        <td>
+                                            <button class="btn btn-outline btn-sm" onclick="registerDiscoveredAsset('${esc(d.ip)}','${esc(d.computer_name || d.hostname)}','${esc(d.device_type)}')">
+                                                ➕ Register
+                                            </button>
+                                        </td>
+                                    `;
+                                    tbody1.appendChild(tr1);
+                                }
+
+                                // 2. Render in WiFi Dashboard Table
+                                const tbody2 = document.getElementById('wifiDevicesTableBody');
+                                if (tbody2) {
+                                    const isAudited = d.audit_status === 'audited';
+                                    let badge = isAudited
+                                        ? `<span class="badge badge-green">Audited</span>`
+                                        : `<span class="badge badge-orange">Unaudited</span>`;
+
+                                    if (isAudited && d.last_audit) {
+                                        badge += `<div style="font-size:11px; color:var(--muted); margin-top:4px;">${esc(d.last_audit)}</div>`;
+                                    }
+
+                                    const usernameHtml = isAudited && d.username !== 'Unknown'
+                                        ? `<span style="font-weight:600; color:var(--text);">${esc(d.username)}</span>`
+                                        : `<span style="color:var(--muted);">${esc(d.username || 'Unaudited Target')}</span>`;
+
+                                    const hostname = d.computer_name || d.hostname || d.ip;
+                                    let osIcon = '';
+                                    let osLower = (d.os_name || '').toLowerCase();
+                                    if (osLower.includes('windows')) osIcon = '🪟';
+                                    else if (osLower.includes('mac')) osIcon = '🍎';
+                                    else if (osLower.includes('ubuntu') || osLower.includes('linux')) osIcon = '🐧';
+
+                                    const osHtml = osIcon ? `<span style="font-weight:500;">${osIcon} &nbsp;${esc(d.os_name || 'Network Target')}</span>` : `<span style="font-weight:500;">${esc(d.os_name || 'Network Target')}</span>`;
+
+                                    const actionBtn = isAudited
+                                        ? `<div style="display:flex; gap:6px;">
+                                             <button class="btn btn-outline btn-sm" onclick="openRemoteAuditModal('${esc(d.ip)}')">Re-audit</button>
+                                             <button class="btn btn-outline btn-sm" onclick="switchTab('software'); setTimeout(()=> {document.getElementById('deviceSelector').value='${esc(d.id || d.computer_name)}'; loadSoftwareForDevice();}, 300)">View Software</button>
+                                           </div>`
+                                        : `<button class="btn btn-primary btn-sm" onclick="openRemoteAuditModal('${esc(d.ip)}')">Send Notification</button>`;
+
+                                    const tr2 = document.createElement('tr');
+                                    tr2.style.animation = 'popIn 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards';
+                                    tr2.innerHTML = `
+                                        <td><b class="td-mono">${esc(d.ip)}</b></td>
+                                        <td><b style="color:var(--text);">${esc(hostname)}</b></td>
+                                        <td>${osHtml}</td>
+                                        <td>${usernameHtml}</td>
+                                        <td><span class="badge badge-purple" style="font-size:11px; font-weight:600;">${esc(d.device_type)}</span></td>
+                                        <td>${badge}</td>
+                                        <td>${actionBtn}</td>
+                                    `;
+                                    tbody2.appendChild(tr2);
+                                }
+
+                                // 3. Keep WiFi panel visible and updated
+                                const wifiPanel = document.getElementById('wifiDevicesPanel');
+                                if (wifiPanel) wifiPanel.style.display = 'block';
+
+                                const wifiMeta = document.getElementById('wifiScanMeta');
+                                if (wifiMeta) {
+                                    wifiMeta.textContent = `${scanData.length} devices on ${ipRange}`;
+                                }
                             }
 
                             function setPresetRange(val) {
@@ -3881,34 +3944,10 @@
 
                             async function rescanWifiDevices() {
                                 const panel = document.getElementById('wifiDevicesPanel');
-                                const spinner = document.getElementById('wifiScanSpinner');
-                                const tbody = document.getElementById('wifiDevicesTableBody');
-                                const btn = document.getElementById('rescanBtn');
-
-                                panel.style.display = 'none';
-                                spinner.style.display = 'block';
-
-                                try {
-                                    const r = await fetch('/wifi/scan-devices');
-                                    const data = await r.json();
-
-                                    if (!r.ok) {
-                                        alert(data.detail || "Scan failed.");
-                                        spinner.style.display = 'none';
-                                        panel.style.display = 'block';
-                                        return;
-                                    }
-
-                                    wifiDeviceData = data.discovered || [];
-                                    document.getElementById('wifiScanMeta').textContent = `${data.total} devices on ${data.ip_range || 'Unknown Subnet'}`;
-                                    renderWifiDevices(wifiDeviceData);
-
-                                } catch (e) {
-                                    alert("Scan error: " + e.message);
-                                } finally {
-                                    spinner.style.display = 'none';
-                                    panel.style.display = 'block';
-                                }
+                                const wifiMeta = document.getElementById('wifiScanMeta');
+                                if (panel) panel.style.display = 'block';
+                                if (wifiMeta) wifiMeta.textContent = 'Live Scanning Subnet…';
+                                await startNetworkScan();
                             }
 
                             function renderWifiDevices(devices) {
