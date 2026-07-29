@@ -7,7 +7,7 @@ import base64
 import uuid
 from fastapi import FastAPI, Query, Request, HTTPException
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, Response, PlainTextResponse, JSONResponse
+from fastapi.responses import FileResponse, Response, PlainTextResponse, JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, validator
 from typing import List, Union, Optional
@@ -1438,6 +1438,55 @@ def download_device_pdf(device_id: str):
     )
 
 
+def get_audit_indexes():
+    audit_index: dict = {}
+    audit_mac_index: dict = {}
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute("SELECT mac_address, computer_name, os_name, execution_datetime, audit_data FROM device_audits ORDER BY id DESC")
+            for row in cursor:
+                c_name = row['computer_name'] or "Unknown"
+                c_mac  = row['mac_address'] or "Unknown"
+                d_os   = row['os_name'] or "Unknown"
+                last_dt = row['execution_datetime'] or ""
+                c_user = "Unknown"
+                net_ips = []
+                if row['audit_data']:
+                    try:
+                        ad = json.loads(row['audit_data'])
+                        c_user = ad.get("current_user") or "Unknown"
+                        users  = ad.get("user_accounts", [])
+                        if c_user == "Unknown" and users and isinstance(users, list):
+                            c_user = users[0].get("name", "Unknown") if isinstance(users[0], dict) else "Unknown"
+                        for net in ad.get("network_details", []):
+                            if isinstance(net, dict):
+                                raw_ip = net.get("ip_address", "") or net.get("ipv4", "")
+                                for ip_part in str(raw_ip).split(","):
+                                    ip_clean = ip_part.strip()
+                                    if ip_clean and ip_clean not in ("Unknown", "N/A", ""):
+                                        net_ips.append(ip_clean)
+                    except Exception:
+                        pass
+                info = {
+                    "id":            c_mac if c_mac != "Unknown" else c_name,
+                    "computer_name": c_name,
+                    "os_name":       d_os,
+                    "username":      c_user,
+                    "last_audit":    last_dt
+                }
+                if c_mac != "Unknown":
+                    clean_mac = c_mac.replace(":", "").replace("-", "").upper()
+                    if clean_mac not in audit_mac_index:
+                        audit_mac_index[clean_mac] = info
+                for ip_item in net_ips:
+                    if ip_item not in audit_index:
+                        audit_index[ip_item] = info
+    except Exception as db_e:
+        logger.warning(f"Could not load audits from DB for scan enrichment: {db_e}")
+    return audit_index, audit_mac_index
+
+
 # ==============================================================================
 # 9. NETWORK DISCOVERY — PHASE 4
 # ==============================================================================
@@ -1649,6 +1698,161 @@ def network_scan(request: NetworkScanRequest):
         "end_ip":           end_host,
         "ip_subnet_range":  f"{start_host} – {end_host}"
     })
+
+
+@app.post("/discover/network-scan-stream")
+def network_scan_stream(request: NetworkScanRequest):
+    """Real-time streaming network scanner — yields discovered devices immediately as SSE events."""
+    def event_generator():
+        try:
+            raw_range = request.ip_range.strip()
+            if '-' in raw_range:
+                parts = [p.strip() for p in raw_range.split('-')]
+                start_ip = ipaddress.IPv4Address(parts[0])
+                end_ip = ipaddress.IPv4Address(parts[1] if '.' in parts[1] else f"{str(parts[0]).rsplit('.', 1)[0]}.{parts[1]}")
+                start_int, end_int = int(start_ip), int(end_ip)
+                if end_int < start_int: start_int, end_int = end_int, start_int
+                hosts = [ipaddress.IPv4Address(ip) for ip in range(start_int, end_int + 1)]
+                network = ipaddress.ip_network(f"{start_ip}/24", strict=False)
+            else:
+                network = ipaddress.ip_network(raw_range, strict=False)
+                hosts = list(network.hosts()) or [network.network_address]
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'detail': str(e)})}\n\n"
+            return
+
+        common_ports  = [22, 23, 80, 135, 443, 445, 3389, 8080, 8443, 9100]
+        timeout_secs  = max(0.1, min(request.timeout_ms / 1000, 2.0))
+
+        PORT_LABELS = {
+            22: "SSH", 23: "Telnet", 80: "HTTP", 135: "RPC",
+            443: "HTTPS", 445: "SMB", 3389: "RDP",
+            8080: "HTTP-Alt", 8443: "HTTPS-Alt", 9100: "Printer/JetDirect"
+        }
+
+        def guess_device_type(open_ports):
+            if 3389 in open_ports and 445 in open_ports: return "Windows Workstation/Server"
+            if 445 in open_ports and 135 in open_ports: return "Windows Host"
+            if 22 in open_ports and 80 not in open_ports and 443 not in open_ports: return "Linux/Unix Server"
+            if 23 in open_ports: return "Network Device (Router/Switch)"
+            if 9100 in open_ports: return "Network Printer"
+            if 80 in open_ports or 443 in open_ports: return "Web Service / Network Device"
+            return "Unknown Device"
+
+        audit_index, audit_mac_index = get_audit_indexes()
+
+        def enrich_dev(device):
+            ip = device.get("ip", "")
+            scan_mac = None
+            for p in device.get("port_labels", []):
+                p_str = str(p)
+                if p_str.startswith("MAC: "):
+                    scan_mac = p_str[5:].replace(":", "").replace("-", "").strip().upper()
+                    break
+            a = audit_mac_index.get(scan_mac) if scan_mac else None
+            if not a:
+                a = audit_index.get(ip)
+            if a:
+                device["id"]            = a["id"]
+                device["computer_name"] = a["computer_name"]
+                device["os_name"]       = a["os_name"]
+                device["username"]      = a["username"]
+                device["last_audit"]    = a["last_audit"]
+                device["audit_status"]  = "audited"
+            else:
+                nb_h = resolve_hostname_netbios(ip)
+                if nb_h:
+                    device["computer_name"] = nb_h
+                else:
+                    dev_t = device.get("device_type", "Network Device")
+                    clean_t = dev_t.replace(" Device", "").replace(" (Firewalled)", "").replace(" Workstation/Server", "").strip()
+                    last_octet = ip.split(".")[-1] if "." in ip else "Device"
+                    device["computer_name"] = f"{clean_t} ({last_octet})" if clean_t and clean_t != "Unknown" else f"Host-{last_octet}"
+                device["os_name"]       = device.get("device_type", "Network Target")
+                device["username"]      = "Unaudited Target"
+                device["last_audit"]    = "—"
+                device["audit_status"]  = "unaudited"
+            return device
+
+        discovered_set = set()
+
+        # Step 1: Fast ICMP Ping Sweep
+        def ping_host(ip_str: str):
+            try:
+                subprocess.run(["ping", "-n", "1", "-w", "300", ip_str], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=0.8)
+            except Exception:
+                pass
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=128) as executor:
+            executor.map(ping_host, [str(h) for h in hosts])
+
+        # Step 2: Parallel Port Scan & Stream Discovered Devices as they Pop Up!
+        def scan_and_yield(ip):
+            ip_str = str(ip)
+            open_ports = []
+            for port in common_ports:
+                try:
+                    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    sock.settimeout(timeout_secs)
+                    if sock.connect_ex((ip_str, port)) == 0:
+                        open_ports.append(port)
+                    sock.close()
+                except Exception:
+                    pass
+            if open_ports:
+                dev = {
+                    "ip":          ip_str,
+                    "hostname":    "N/A",
+                    "open_ports":  open_ports,
+                    "port_labels": [f"{p} ({PORT_LABELS.get(p, 'Unknown')})" for p in open_ports],
+                    "device_type": guess_device_type(open_ports),
+                    "status":      "online",
+                }
+                return enrich_dev(dev)
+            return None
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=64) as executor:
+            futures = {executor.submit(scan_and_yield, h): h for h in hosts}
+            for future in concurrent.futures.as_completed(futures):
+                res = future.result()
+                if res and res["ip"] not in discovered_set:
+                    discovered_set.add(res["ip"])
+                    yield f"data: {json.dumps({'type': 'device', 'device': res})}\n\n"
+
+        # Step 3: ARP Fallback for mobile / firewalled devices & Stream them!
+        try:
+            broadcast_ip  = str(network.broadcast_address)
+            network_ip    = str(network.network_address)
+            BROADCAST_MACS = {"ff-ff-ff-ff-ff-ff", "ff:ff:ff:ff:ff:ff", "00-00-00-00-00-00"}
+            arp_out, _ = _run_cmd("arp -a")
+            for line in arp_out.splitlines():
+                parts = line.strip().split()
+                if len(parts) >= 3 and parts[2].lower() in ("dynamic", "static"):
+                    ip_str, mac_str = parts[0], parts[1].lower()
+                    if ip_str not in (broadcast_ip, network_ip) and mac_str not in BROADCAST_MACS:
+                        try:
+                            if ipaddress.IPv4Address(ip_str) in network and ip_str not in discovered_set:
+                                discovered_set.add(ip_str)
+                                prefix = mac_str.replace(":", "").replace("-", "").upper()[:6]
+                                vendor = mac_vendor_dict.get(prefix, "")
+                                dev_type = f"{vendor} Device" if vendor else "Network Device (Firewalled)"
+                                dev = {
+                                    "ip":          ip_str,
+                                    "hostname":    "N/A",
+                                    "open_ports":  [],
+                                    "port_labels": [f"MAC: {mac_str}"],
+                                    "device_type": dev_type,
+                                    "status":      "online"
+                                }
+                                yield f"data: {json.dumps({'type': 'device', 'device': enrich_dev(dev)})}\n\n"
+                        except Exception:
+                            pass
+        except Exception:
+            pass
+
+        yield f"data: {json.dumps({'type': 'complete', 'total': len(discovered_set), 'scanned': len(hosts)})}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
 # ==============================================================================

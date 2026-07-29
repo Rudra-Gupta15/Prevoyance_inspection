@@ -57,6 +57,11 @@
 
         html { scroll-behavior: smooth; }
 
+        @keyframes popIn {
+            0% { opacity: 0; transform: scale(0.96) translateY(-4px); }
+            100% { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
         body {
             font-family: 'Inter', system-ui, -apple-system, 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif;
             background: var(--surface-2);
@@ -2442,25 +2447,75 @@
                                 btn.disabled = true;
                                 btn.textContent = '⏳ Scanning…';
                                 document.getElementById('scanStatus').style.display = 'block';
-                                document.getElementById('scanResults').style.display = 'none';
+                                document.getElementById('scanResults').style.display = 'block';
+
+                                const tbody = document.getElementById('scanTableBody');
+                                const summary = document.getElementById('scanSummary');
+                                tbody.innerHTML = '';
+                                scanData = [];
+                                let count = 0;
+
+                                summary.innerHTML = `<span style="display:inline-flex; align-items:center; gap:8px;"><span class="status-dot warning pulse"></span> Live Scanning <b>${esc(ipRange)}</b> — Discovered devices will pop up below in real-time… (<b id="liveCount">0</b> found)</span>`;
                                 setGlobalStatus('busy', 'Scanning Network…');
 
                                 try {
-                                    const r = await fetch('/discover/network-scan', {
+                                    const response = await fetch('/discover/network-scan-stream', {
                                         method: 'POST',
                                         headers: { 'Content-Type': 'application/json' },
                                         body: JSON.stringify({ ip_range: ipRange, timeout_ms: timeoutMs }),
                                     });
-                                    const data = await r.json();
 
-                                    if (!r.ok) {
-                                        alert(data.detail || 'Scan failed.');
+                                    if (!response.ok) {
+                                        const errData = await response.json().catch(() => ({}));
+                                        alert(errData.detail || 'Scan failed.');
                                         return;
                                     }
 
-                                    scanData = data.discovered || [];
-                                    renderScanResults(data);
-                                    setGlobalStatus('ok', `Found ${data.total} devices`);
+                                    const reader = response.body.getReader();
+                                    const decoder = new TextDecoder();
+                                    let buffer = '';
+
+                                    while (true) {
+                                        const { value, done } = await reader.read();
+                                        if (done) break;
+                                        buffer += decoder.decode(value, { stream: true });
+
+                                        const lines = buffer.split('\n');
+                                        buffer = lines.pop() || '';
+
+                                        for (const line of lines) {
+                                            if (line.startsWith('data: ')) {
+                                                const jsonStr = line.replace(/^data:\s*/, '').trim();
+                                                if (!jsonStr) continue;
+                                                try {
+                                                    const event = JSON.parse(jsonStr);
+                                                    if (event.type === 'device' && event.device) {
+                                                        const d = event.device;
+                                                        scanData.push(d);
+                                                        count++;
+                                                        const liveCountEl = document.getElementById('liveCount');
+                                                        if (liveCountEl) liveCountEl.textContent = count;
+
+                                                        appendDiscoveredDeviceRow(d, ipRange);
+                                                    } else if (event.type === 'complete') {
+                                                        summary.innerHTML = `✅ <b>Scan Complete</b>: Discovered <b>${event.total}</b> live device${event.total !== 1 ? 's' : ''} out of <b>${event.scanned || 254}</b> hosts scanned in <b>${esc(ipRange)}</b>.`;
+                                                        setGlobalStatus('ok', `Found ${event.total} devices`);
+                                                    }
+                                                } catch (e) {
+                                                    console.error('SSE parse error:', e);
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    if (scanData.length === 0) {
+                                        tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state">
+                                            <div class="empty-icon">📡</div>
+                                            <h3>No devices found</h3>
+                                            <p>No live hosts detected in the scanned range (${esc(ipRange)}). Try a longer timeout or different range.</p>
+                                        </div></td></tr>`;
+                                        summary.textContent = `No devices found in ${ipRange}`;
+                                    }
                                 } catch (e) {
                                     alert('Network error: ' + e.message);
                                     setGlobalStatus('err', 'Scan Error');
@@ -2469,6 +2524,25 @@
                                     btn.disabled = false;
                                     btn.innerHTML = '🔍 &nbsp;Start Scan';
                                 }
+                            }
+
+                            function appendDiscoveredDeviceRow(d, ipRange) {
+                                const tbody = document.getElementById('scanTableBody');
+                                const tr = document.createElement('tr');
+                                tr.style.animation = 'popIn 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards';
+                                tr.innerHTML = `
+                                    <td><b class="td-mono">${esc(d.ip)}</b></td>
+                                    <td style="color:var(--text-2); font-weight:500;">${esc(d.computer_name || d.hostname || 'N/A')}</td>
+                                    <td><span class="badge badge-purple" style="font-size:11px; font-weight:600;">${esc(ipRange)}</span></td>
+                                    <td>${(d.port_labels || []).map(p => `<span class="port-tag">${esc(p)}</span>`).join(' ')}</td>
+                                    <td><span class="badge badge-blue">${esc(d.device_type)}</span></td>
+                                    <td>
+                                        <button class="btn btn-outline btn-sm" onclick="registerDiscoveredAsset('${esc(d.ip)}','${esc(d.computer_name || d.hostname)}','${esc(d.device_type)}')">
+                                            ➕ Register
+                                        </button>
+                                    </td>
+                                `;
+                                tbody.appendChild(tr);
                             }
 
                             function setPresetRange(val) {
