@@ -231,8 +231,20 @@ try {
 # ---------------------------------------------------------
 Write-Host "Collecting device identity..." -ForegroundColor Cyan
 $cs = Get-CimInstance Win32_ComputerSystem
-$manufacturer = Get-SafeString $cs.Manufacturer
-$model = Get-SafeString $cs.Model
+$csp = Get-CimInstance Win32_ComputerSystemProduct -ErrorAction SilentlyContinue
+if ($csp -and $csp.Name -and $csp.Name -notmatch 'System Product|To Be Filled|Default') {
+    $manufacturer = Get-SafeString $csp.Vendor
+    $model = Get-SafeString $csp.Name
+} else {
+    $manufacturer = Get-SafeString $cs.Manufacturer
+    $model = Get-SafeString $cs.Model
+}
+if ($model -match 'SN5000S|EVMNV|Disk|Drive|Storage|Generic') {
+    $moboTemp = Get-CimInstance Win32_BaseBoard -ErrorAction SilentlyContinue
+    if ($moboTemp -and $moboTemp.Product) {
+        $model = Get-SafeString $moboTemp.Product
+    }
+}
 
 $bios = Get-CimInstance Win32_BIOS
 $serialNumber = Get-SafeString $bios.SerialNumber
@@ -396,7 +408,7 @@ try {
     }
 } catch {}
 
-# 2. External Physical Keyboards (Exclude Built-in Laptop / Virtual drivers)
+# 2. Keyboards (Only REAL External USB / Bluetooth Keyboards, exclude built-in laptop hotkeys/PS2)
 try {
     $kbds = Get-CimInstance Win32_Keyboard -ErrorAction SilentlyContinue
     foreach ($k in $kbds) {
@@ -404,7 +416,7 @@ try {
         $kName = Get-SafeString $k.Description
         if (-not $kName -or $kName -eq "Unknown") { $kName = Get-SafeString $k.Name }
 
-        if ($kName -and $devId -like 'USB*' -and $devId -notmatch 'ASUP|VHF') {
+        if ($kName -and $devId -notmatch 'ACPI|PNP0303|ASUP|VHF|VID_0B05&PID_19B6|Virtual' -and ($devId -like 'USB*' -or $devId -like 'HID\*') -and $kName -notmatch 'Standard PS/2|HID Keyboard Device|Enhanced \(101-') {
             $peripherals += @{
                 name            = $kName
                 type            = "Keyboard"
@@ -415,37 +427,59 @@ try {
     }
 } catch {}
 
-# 3. External Physical Printers (Must be physically connected & active right now)
+# 3. External Physical & Installed Printers
 try {
     $prts = Get-CimInstance Win32_Printer -ErrorAction SilentlyContinue
     foreach ($p in $prts) {
         $pName = Get-SafeString $p.Name
         if ($pName -and $pName -notmatch 'Microsoft Print to PDF|OneNote|Fax|XPS Document Writer|Root|Virtual') {
-            # Only include if WorkOffline is False and PrinterStatus is NOT 7 (Offline)
-            if (-not $p.WorkOffline -and $p.PrinterStatus -ne 7 -and $p.PrinterState -ne 128) {
-                $peripherals += @{
-                    name            = $pName
-                    type            = "Printer"
-                    connection_type = "USB / Network"
-                    status          = "Connected & Online"
-                }
+            $statusText = if ($p.WorkOffline -or $p.PrinterStatus -eq 7) { "Offline" } else { "Connected & Online" }
+            $peripherals += @{
+                name            = $pName
+                type            = "Printer"
+                connection_type = if (Get-SafeString $p.PortName -like 'USB*') { "USB" } else { "USB / Network" }
+                status          = $statusText
             }
         }
     }
 } catch {}
 
-# 4. External Monitors / Displays (Exclude Internal Laptop Screen / Default Monitor)
+# 4. External Monitors / Displays (HDMI / DisplayPort ONLY - Exclude Internal Laptop Screen)
 try {
-    $mons = Get-CimInstance Win32_DesktopMonitor -ErrorAction SilentlyContinue
-    foreach ($mn in $mons) {
-        $mnName = Get-SafeString $mn.Name
-        $devId = Get-SafeString $mn.DeviceID
-        if ($mnName -and $mnName -notmatch 'Generic PnP Monitor|Default Monitor' -and $devId -notmatch 'Default_Monitor') {
+    $connParams = @{}
+    Get-CimInstance -Namespace root\wmi -ClassName WmiMonitorConnectionParams -ErrorAction SilentlyContinue | ForEach-Object {
+        $connParams[$_.InstanceName] = $_.VideoOutputTechnology
+    }
+
+    $wmiMons = Get-CimInstance -Namespace root\wmi -ClassName WmiMonitorID -ErrorAction SilentlyContinue
+    foreach ($wm in $wmiMons) {
+        $instName = $wm.InstanceName
+        $vout = $connParams[$instName]
+
+        # 2147483648 = Internal Display Panel (eDP / LVDS)
+        if ($vout -eq 2147483648 -or $vout -eq 0 -or $vout -eq 11) {
+            continue
+        }
+
+        $mName = ""
+        if ($wm.UserFriendlyName) {
+            $mName = [System.Text.Encoding]::ASCII.GetString($wm.UserFriendlyName -ne 0).Trim()
+        }
+        if (-not $mName -and $wm.ManufacturerName) {
+            $mName = [System.Text.Encoding]::ASCII.GetString($wm.ManufacturerName -ne 0).Trim() + " External Monitor"
+        }
+
+        if ($mName -match '^(ATN|SDC|BOE|AUO|LGD|SHP|CMN|INT)\d+' -or $mName -match 'ATNA40CU05|Internal|Generic PnP') {
+            continue
+        }
+
+        if ($mName) {
             $peripherals += @{
-                name            = $mnName
+                name            = $mName
                 type            = "Monitor"
-                connection_type = "DisplayPort / HDMI"
-                status          = "Connected"
+                connection_type = "HDMI / DisplayPort"
+                status          = "Connected & Online"
+                is_present      = $true
             }
         }
     }
@@ -463,6 +497,94 @@ try {
                 type            = "Storage"
                 connection_type = "USB Drive"
                 status          = "Mounted"
+            }
+        }
+    }
+} catch {}
+
+# 6. 30-Day USB Peripheral Connection History
+$usbHistory = @()
+$seenNames = @{}
+try {
+    $pnpDevs = Get-PnpDevice -ErrorAction SilentlyContinue
+    foreach ($dev in $pnpDevs) {
+        $iid = Get-SafeString $dev.InstanceId
+        $fname = Get-SafeString $dev.FriendlyName
+        if (-not $fname) { continue }
+
+        if ($iid -like 'USB*' -or $iid -like 'USBSTOR*') {
+            if ($fname -match 'Hub|Controller|Host|Root|Composite|Virtual|Generic|Standard|System|Volume|Audio|Bus|ASUS|ACPI') { continue }
+            if ($iid -match 'VID_0B05&PID_19B6') { continue }
+
+            $name = $fname
+            if ($name -eq "USB Input Device" -or $name -eq "USB Mass Storage Device") {
+                if ($iid -match 'VEN_([^\&]+)\&PROD_([^\&]+)') {
+                    $name = "$($Matches[1]) $($Matches[2])".Replace('_', ' ')
+                }
+            }
+
+            if ($name -and $name -notmatch 'USB Input Device|USB Composite Device|Root Hub|Host Controller' -and -not $seenNames[$name]) {
+                $seenNames[$name] = $true
+                $statusStr = if ([bool]$dev.Present) { "Active / Connected" } else { "Previously Connected (Last 30 Days)" }
+
+                $mftr = Get-SafeString $dev.Manufacturer
+                if (-not $mftr -or $mftr -match 'Standard|Generic|WinUsb|Compatible') {
+                    if ($name -match '^(SanDisk|Samsung|HP|Hewlett-Packard|Logitech|MediaTek|Realtek|Intel|Dell|Lenovo|Asus|Apple|Microsoft|General)\b') {
+                        $mftr = $Matches[1]
+                    } else {
+                        $mftr = "OEM / Generic"
+                    }
+                }
+
+                $ver = "v1.0"
+                if ($iid -match 'REV_([^\&\\\/]+)') {
+                    $ver = "v" + $Matches[1]
+                } elseif ($iid -match 'PID_([^\&\\\/]+)') {
+                    $ver = "v" + $Matches[1]
+                }
+
+                $usbHistory += @{
+                    device_name     = $name
+                    manufacturer    = $mftr
+                    version         = $ver
+                    class           = Get-SafeString $dev.Class
+                    connection_type = "USB"
+                    status          = $statusStr
+                    is_present      = [bool]$dev.Present
+                }
+            }
+        }
+    }
+
+    $usbstor = Get-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Enum\USBSTOR\*\*' -ErrorAction SilentlyContinue
+    foreach ($dev in $usbstor) {
+        $fname = Get-SafeString $dev.FriendlyName
+        if (-not $fname) { $fname = Get-SafeString $dev.Mfg }
+        if ($fname -and $fname -notmatch 'Virtual' -and -not $seenNames[$fname]) {
+            $seenNames[$fname] = $true
+
+            $mftr = Get-SafeString $dev.Mfg
+            if (-not $mftr -or $mftr -match 'Standard') {
+                if ($fname -match '^(SanDisk|Kingston|Samsung|Toshiba|Seagate|WD|Western Digital|HP|General)\b') {
+                    $mftr = $Matches[1]
+                } else {
+                    $mftr = "USB Storage Vendor"
+                }
+            }
+
+            $ver = "v1.0.0"
+            if ($dev.PSChildName -match 'REV_([^\&\\\/]+)') {
+                $ver = "v" + $Matches[1]
+            }
+
+            $usbHistory += @{
+                device_name     = $fname
+                manufacturer    = $mftr
+                version         = $ver
+                class           = "DiskDrive"
+                connection_type = "USB Mass Storage"
+                status          = "Previously Connected (Last 30 Days)"
+                is_present      = $false
             }
         }
     }
@@ -607,6 +729,7 @@ Write-Host "Collecting recent login history..." -ForegroundColor Cyan
 $loginHistory = @()
 
 # 1. Try Security Log Event 4624
+$seenLogins = @{}
 try {
     $secEvents = Get-WinEvent -FilterHashtable @{LogName='Security'; Id=4624} -MaxEvents 50 -ErrorAction SilentlyContinue
     foreach ($e in $secEvents) {
@@ -621,11 +744,16 @@ try {
                 11 { "Cached Interactive" }
                 default { "Local Administrator" }
             }
-            $loginHistory += @{
-                username   = $uName
-                domain     = if ($dom) { $dom } else { "LOCAL" }
-                logon_type = $lType
-                time       = $e.TimeCreated.ToString("yyyy-MM-dd HH:mm:ss")
+            $timeStr = $e.TimeCreated.ToString("yyyy-MM-dd HH:mm:ss")
+            $dedupKey = "$uName|$timeStr|$lType"
+            if (-not $seenLogins[$dedupKey]) {
+                $seenLogins[$dedupKey] = $true
+                $loginHistory += @{
+                    username   = $uName
+                    domain     = if ($dom) { $dom } else { "LOCAL" }
+                    logon_type = $lType
+                    time       = $timeStr
+                }
             }
             if ($loginHistory.Count -ge 25) { break }
         }
@@ -639,11 +767,16 @@ if ($loginHistory.Count -eq 0) {
         foreach ($se in $sysEvents) {
             $eType = if ($se.Id -eq 7001) { "Interactive Logon" } else { "Logoff / Session End" }
             $uName = $env:USERNAME
-            $loginHistory += @{
-                username   = $uName
-                domain     = if ($env:USERDOMAIN) { $env:USERDOMAIN } else { "LOCAL" }
-                logon_type = $eType
-                time       = $se.TimeCreated.ToString("yyyy-MM-dd HH:mm:ss")
+            $timeStr = $se.TimeCreated.ToString("yyyy-MM-dd HH:mm:ss")
+            $dedupKey = "$uName|$timeStr|$eType"
+            if (-not $seenLogins[$dedupKey]) {
+                $seenLogins[$dedupKey] = $true
+                $loginHistory += @{
+                    username   = $uName
+                    domain     = if ($env:USERDOMAIN) { $env:USERDOMAIN } else { "LOCAL" }
+                    logon_type = $eType
+                    time       = $timeStr
+                }
             }
             if ($loginHistory.Count -ge 25) { break }
         }
@@ -679,6 +812,26 @@ elseif ($manufacturer -match "Asus|Acer|MSI") { $autoWarrantyProvider = "$manufa
 else { $autoWarrantyProvider = "$manufacturer Direct Warranty" }
 
 
+# Collect Detailed Printers List
+$detectedPrinters = @()
+try {
+    $prts = Get-CimInstance Win32_Printer -ErrorAction SilentlyContinue
+    foreach ($p in $prts) {
+        $pName = Get-SafeString $p.Name
+        if ($pName -and $pName -notmatch 'Microsoft Print to PDF|OneNote|Fax|XPS Document Writer|Root|Virtual') {
+            $pStatus = if ($p.WorkOffline -or $p.PrinterStatus -eq 7) { "Offline" } else { "Online" }
+            $detectedPrinters += @{
+                name                    = $pName
+                port_name               = Get-SafeString $p.PortName
+                driver_name             = Get-SafeString $p.DriverName
+                status                  = $pStatus
+                work_offline            = [bool]$p.WorkOffline
+                extended_printer_status = "Status: $pStatus (Port: $(Get-SafeString $p.PortName))"
+            }
+        }
+    }
+} catch {}
+
 # ---------------------------------------------------------
 # Payload Construction
 # ---------------------------------------------------------
@@ -712,7 +865,7 @@ $data = @{
     mac_address           = $mac
     drive_name            = "No CD Unit Found"
     compression_utilities = @()
-    printers              = @()
+    printers              = $detectedPrinters
     
     hardware_details      = @{
         cpu               = $processorName
@@ -762,7 +915,9 @@ $data = @{
         network_adapters      = $networkAdapters
         peripherals           = $peripherals
         disk_partitions       = $diskPartitions
+        usb_history           = $usbHistory
     }
+    usb_history           = $usbHistory
     network_details       = $networkAdapters
     user_accounts         = $userAccounts
     software_inventory    = $softwareInventory

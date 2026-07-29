@@ -259,6 +259,7 @@ class HardwareDetails(BaseModel):
     network_adapters: List[Union[NetworkAdapter, dict]] = []
     peripherals: List[Union[Peripheral, dict]] = []
     disk_partitions: List[Union[DiskPartition, dict]] = []
+    usb_history: List[dict] = []
 
     @validator("cpu", "ram", "disk", "serial_number", "manufacturer", "model", "processor_name", "installed_ram", pre=True, always=True, allow_reuse=True)
     def normalize_str(cls, v):
@@ -367,6 +368,7 @@ class AuditData(BaseModel):
     user_accounts: List[Union[UserAccount, dict, str]] = []
     software_inventory: List[Union[SoftwareEntry, dict]] = []
     login_history: List[dict] = []
+    usb_history: List[dict] = []
 
     @validator(
         "execution_datetime", "consent", "computer_name", "os_name",
@@ -1207,10 +1209,31 @@ def list_audited_devices():
             key = (name.lower(), os_family)
             if key not in devices:
                 user = "Unknown"
+                model_name = ""
                 if row['audit_data']:
                     try:
                         ad = json.loads(row['audit_data'])
                         user = ad.get("current_user") or ad.get("user") or "Unknown"
+                        hw = ad.get("hardware_details", {})
+                        if isinstance(hw, dict):
+                            mfr = (hw.get("manufacturer") or "").strip()
+                            mdl = (hw.get("model") or "").strip()
+                            if mfr and mdl and mdl != "Unknown" and mdl != "N/A":
+                                if "ASUSTeK" in mfr or "ASUS" in mfr:
+                                    mfr = "ASUS"
+                                elif "Hewlett" in mfr or "HP" in mfr:
+                                    mfr = "HP"
+                                elif "Lenovo" in mfr:
+                                    mfr = "Lenovo"
+                                elif "Dell" in mfr:
+                                    mfr = "Dell"
+                                elif "Apple" in mfr:
+                                    mfr = "Apple"
+                                mdl_clean = mdl.split('_')[0].strip()
+                                if mdl_clean.lower().startswith(mfr.lower()):
+                                    model_name = mdl_clean
+                                else:
+                                    model_name = f"{mfr} {mdl_clean}".strip()
                     except Exception:
                         pass
 
@@ -1219,6 +1242,7 @@ def list_audited_devices():
                 devices[key] = {
                     "id": uid,
                     "computer_name": name,
+                    "model_name": model_name or name,
                     "os_name": os_name,
                     "username": user,
                     "last_seen": row['execution_datetime']
@@ -1677,6 +1701,28 @@ def get_wifi_networks():
     if current.get("ssid"):
         networks.append(current)
 
+    # Query saved Windows WiFi profiles
+    saved_profiles = set()
+    try:
+        p_stdout, _ = _run_cmd("netsh wlan show profiles")
+        for line in p_stdout.splitlines():
+            if ":" in line and ("All User Profile" in line or "User Profile" in line):
+                pname = line.split(":", 1)[1].strip()
+                if pname:
+                    saved_profiles.add(pname)
+    except Exception:
+        pass
+
+    # Query DB saved wifi credentials
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            rows = conn.execute("SELECT ssid FROM wifi_credentials").fetchall()
+            for r in rows:
+                if r[0]:
+                    saved_profiles.add(r[0])
+    except Exception:
+        pass
+
     # Deduplicate: keep highest signal per SSID
     seen: dict = {}
     for n in networks:
@@ -1684,7 +1730,7 @@ def get_wifi_networks():
         raw  = n.get("signal", "0%").replace("%", "")
         sig  = int(raw) if raw.isdigit() else 0
         if ssid not in seen or sig > seen[ssid]["_sig"]:
-            seen[ssid] = {**n, "_sig": sig}
+            seen[ssid] = {**n, "_sig": sig, "has_saved_password": (ssid in saved_profiles)}
 
     result = [{k: v for k, v in net.items() if k != "_sig"} for net in seen.values()]
     result.sort(

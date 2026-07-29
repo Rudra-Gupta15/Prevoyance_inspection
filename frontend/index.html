@@ -1169,9 +1169,9 @@
                                     </div>
 
                                     <div style="background: #ffffff; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px; box-shadow: var(--shadow-sm);">
-                                        <div class="card-title" style="margin-bottom:14px; font-size:15px; font-weight:700; display:flex; align-items:center; gap:8px; color:var(--primary);">7. Peripherals &amp; Hardware</div>
-                                        <div style="display:grid; grid-template-columns: max-content max-content 1fr; gap: 10px 16px; background: #f8fafc; padding: 18px; border-radius: 8px; font-size:13.5px;">
-                                            <span style="color:var(--muted); font-weight:600;">Peripherals</span><span>=</span><span id="specPeripherals" style="color:var(--text-1);">—</span>
+                                        <div class="card-title" style="margin-bottom:14px; font-size:15px; font-weight:700; display:flex; align-items:center; gap:8px; color:var(--primary);">7. Peripherals &amp; Hardware History (Last 30 Days)</div>
+                                        <div style="background: #f8fafc; padding: 18px; border-radius: 8px; font-size:13.5px;">
+                                            <div id="specPeripherals">—</div>
                                         </div>
                                     </div>
 
@@ -1333,7 +1333,7 @@
                                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
                                     <div>
                                         <div class="card-title" style="display:flex; align-items:center; gap:8px;">
-                                            📊 Change Report
+                                            Change Report
                                             <span id="changeReportScanCount" class="badge badge-blue" style="font-size:11px;"></span>
                                         </div>
                                         <div class="card-subtitle" id="changeReportMeta">Comparing last two scans…</div>
@@ -1341,29 +1341,29 @@
                                 </div>
 
                                 <div id="changeDiffNone" style="display:none; text-align:center; padding:20px; color:var(--muted); font-size:13px; background:#f8fafc; border-radius:8px;">
-                                    🔍 Only <b>1 scan</b> found for this device. Run a second audit to see what changed.
+                                    Only <b>1 scan</b> found for this device. Run a second audit to see what changed.
                                 </div>
 
                                 <div id="changeDiffContent" style="display:none;">
 
                                     <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:20px;">
                                         <div id="diffBadgeInstalled" style="display:flex; align-items:center; gap:6px; background:#d1fae5; color:#065f46; padding:8px 14px; border-radius:8px; font-weight:600; font-size:13px;">
-                                            ✅ <span id="diffInstalledCount">0</span> Newly Installed
+                                            <span id="diffInstalledCount">0</span> Newly Installed
                                         </div>
                                         <div id="diffBadgeRemoved" style="display:flex; align-items:center; gap:6px; background:#fee2e2; color:#991b1b; padding:8px 14px; border-radius:8px; font-weight:600; font-size:13px;">
-                                            ❌ <span id="diffRemovedCount">0</span> Removed
+                                            <span id="diffRemovedCount">0</span> Removed
                                         </div>
                                         <div id="diffBadgeHw" style="display:flex; align-items:center; gap:6px; background:#fef3c7; color:#92400e; padding:8px 14px; border-radius:8px; font-weight:600; font-size:13px;">
-                                            ⚠️ <span id="diffHwCount">0</span> Hardware Changes
+                                            <span id="diffHwCount">0</span> Hardware Changes
                                         </div>
                                     </div>
 
                                     <div id="diffNoChanges" style="display:none; text-align:center; padding:20px; color:var(--muted); background:#f0fdf4; border-radius:8px; font-size:13px;">
-                                        ✅ No changes detected between the last two scans. Device is stable.
+                                        No changes detected between the last two scans. Device is stable.
                                     </div>
 
                                     <div id="diffHwSection" style="display:none; margin-bottom:20px;">
-                                        <div style="font-weight:700; font-size:13px; color:#92400e; margin-bottom:8px; display:flex; align-items:center; gap:6px;">⚠️ Hardware / OS Changes</div>
+                                        <div style="font-weight:700; font-size:13px; color:#92400e; margin-bottom:8px; display:flex; align-items:center; gap:6px;">Hardware / OS Changes</div>
                                         <div class="table-wrap">
                                             <table>
                                                 <thead>
@@ -1379,7 +1379,7 @@
                                     </div>
 
                                     <div id="diffInstalledSection" style="display:none; margin-bottom:20px;">
-                                        <div style="font-weight:700; font-size:13px; color:#065f46; margin-bottom:8px; display:flex; align-items:center; gap:6px;">✅ Newly Installed Software</div>
+                                        <div style="font-weight:700; font-size:13px; color:#065f46; margin-bottom:8px; display:flex; align-items:center; gap:6px;">Newly Installed Software</div>
                                         <div class="table-wrap">
                                             <table>
                                                 <thead>
@@ -1396,7 +1396,7 @@
                                     </div>
 
                                     <div id="diffRemovedSection" style="display:none;">
-                                        <div style="font-weight:700; font-size:13px; color:#991b1b; margin-bottom:8px; display:flex; align-items:center; gap:6px;">❌ Removed / Uninstalled Software</div>
+                                        <div style="font-weight:700; font-size:13px; color:#991b1b; margin-bottom:8px; display:flex; align-items:center; gap:6px;">Removed / Uninstalled Software</div>
                                         <div class="table-wrap">
                                             <table>
                                                 <thead>
@@ -2563,7 +2563,6 @@
                                 const autoVendor = hwData.manufacturer || auditData.manufacturer || '—';
                                 const autoStatus = auditData.life_cycle || hwData.life_cycle || 'Active';
                                 const autoWarrantyProvider = hwData.auto_warranty_provider || (autoVendor !== '—' ? `${autoVendor} OEM Warranty` : 'N/A');
-                                const autoPurchaseDate = auditData.last_boot || '—';
 
                                 try {
                                     const res = await fetch(`/api/lifecycle/${encodeURIComponent(name)}`);
@@ -2574,7 +2573,7 @@
                                         setTxt('lifeVendorVal', l.vendor || autoVendor);
                                         setTxt('lifeSupplierVal', l.supplier || '—');
                                         setTxt('lifePriceVal', l.purchase_price ? `₹${l.purchase_price}` : '—');
-                                        setTxt('lifePurchaseDateVal', l.purchase_date || autoPurchaseDate);
+                                        setTxt('lifePurchaseDateVal', l.purchase_date || '—');
                                         setTxt('lifePoVal', l.po_number || '—');
                                         setTxt('lifeWarrantyDatesVal', (l.warranty_start && l.warranty_end) ? `${l.warranty_start} to ${l.warranty_end}` : (l.warranty_start || l.warranty_end || '—'));
                                         setTxt('lifeWarrantyProviderVal', l.warranty_provider || autoWarrantyProvider);
@@ -2602,7 +2601,7 @@
                                 setTxt('lifeVendorVal', autoVendor);
                                 setTxt('lifeSupplierVal', '—');
                                 setTxt('lifePriceVal', '—');
-                                setTxt('lifePurchaseDateVal', autoPurchaseDate);
+                                setTxt('lifePurchaseDateVal', '—');
                                 setTxt('lifePoVal', '—');
                                 setTxt('lifeWarrantyDatesVal', '—');
                                 setTxt('lifeWarrantyProviderVal', autoWarrantyProvider);
@@ -2785,7 +2784,7 @@
                                             const opt = document.createElement('option');
                                             opt.value = d.id || d.computer_name;
                                             const displayTime = d.last_seen ? d.last_seen.replace('_', ' ') : 'Unknown';
-                                            const namePart = `${d.computer_name} (${d.os_name || ''})`;
+                                            const namePart = `${d.model_name || d.computer_name} (${d.os_name || ''})`;
                                             opt.innerHTML = `[${displayTime}]&emsp;&emsp;${namePart}`;
                                             if (!firstVal) firstVal = opt.value;
                                             if (curr && opt.value === curr) opt.selected = true;
@@ -2848,13 +2847,43 @@
                                     }
                                     const data = await r.json();
                                     swData = data.software_inventory || [];
+                                    const hw = data.hardware_details || {};
 
-                                    setTxt('swDeviceTitle', name);
+                                    // Construct Laptop Model Name for header title (e.g. Asus Zephyrus G14)
+                                    let laptopTitle = '';
+                                    if (hw.model && hw.model !== 'Unknown' && hw.model !== 'N/A') {
+                                        let cleanModel = hw.model;
+                                        if (cleanModel.includes('SN5000S') || cleanModel.includes('EVMNV')) {
+                                            if (hw.mobo_product && hw.mobo_product !== 'Unknown') {
+                                                cleanModel = hw.mobo_product;
+                                            }
+                                        }
+                                        
+                                        let mfrLower = (hw.manufacturer || '').toLowerCase();
+                                        let mfr = 'OEM';
+                                        if (mfrLower.includes('asus')) mfr = 'ASUS';
+                                        else if (mfrLower.includes('hp') || mfrLower.includes('hewlett')) mfr = 'HP';
+                                        else if (mfrLower.includes('lenovo')) mfr = 'Lenovo';
+                                        else if (mfrLower.includes('dell')) mfr = 'Dell';
+                                        else if (mfrLower.includes('apple')) mfr = 'Apple';
+
+                                        let cleanMdlName = cleanModel.replace(/_[A-Z0-9_]+$/i, '').trim();
+                                        if (cleanMdlName.toLowerCase().startsWith(mfr.toLowerCase())) {
+                                            laptopTitle = cleanMdlName;
+                                        } else {
+                                            laptopTitle = `${mfr} ${cleanMdlName}`.trim();
+                                        }
+                                    }
+
+                                    if (!laptopTitle || laptopTitle === 'Unknown' || laptopTitle.includes('SN5000S')) {
+                                        laptopTitle = data.computer_name || name;
+                                    }
+
+                                    setTxt('swDeviceTitle', laptopTitle);
                                     setTxt('swDeviceMeta', `Last audited: ${data.last_audit || 'Unknown'} | Architecture: ${data.architecture || 'Unknown'}`);
                                     setTxt('swLicenseStatus', data.license_status || 'Unknown License');
                                     setTxt('swTotalBadge', `${data.total ?? swData.length} apps`);
 
-                                    const hw = data.hardware_details || {};
                                     setTxt('specHostname', data.computer_name || '—');
 
                                     const osStr = (data.os_name && data.os_name !== 'Unknown') ? `${data.os_name} ${data.os_version || ''}` : 'Windows / macOS';
@@ -3003,20 +3032,73 @@
                                         setTxt('specNetHardware', '—');
                                     }
 
-                                    let periList = hw.peripherals || data.peripherals || [];
-                                    if (periList.length > 0) {
-                                        let periHtml = `<ul style="margin:0; padding-left:18px; line-height:1.6;">` + periList.map(p => {
-                                            const pName = esc(p.name || 'Device');
-                                            const pType = p.type ? ` <span class="badge badge-gray" style="font-size:10px; padding:1px 5px; margin-left:6px;">${esc(p.type)}</span>` : '';
-                                            return `<li>${pName}${pType}</li>`;
-                                        }).join('') + `</ul>`;
-                                        setHtml('specPeripherals', periHtml);
+                                    // Populate Section 7: Peripherals & Hardware History (Stacked vertically down-by-down)
+                                    const usbHist = hw.usb_history || data.usb_history || [];
+                                    let periList = (hw.peripherals || data.peripherals || []).filter(p => {
+                                        const nl = (p.name || '').toLowerCase();
+                                        return !nl.includes('hid keyboard device') && !nl.includes('standard ps/2') && !nl.includes('enhanced (101-');
+                                    });
+
+                                    let allDevicesMap = {};
+                                    if (Array.isArray(usbHist) && usbHist.length > 0) {
+                                        usbHist.forEach(item => {
+                                            const dName = (item.device_name || 'USB Device').trim();
+                                            if (dName) {
+                                                allDevicesMap[dName.toLowerCase()] = {
+                                                    name: dName,
+                                                    type: item.class || 'USB Device',
+                                                    manufacturer: item.manufacturer || 'OEM / Generic',
+                                                    version: item.version || 'v1.0',
+                                                    is_present: item.is_present
+                                                };
+                                            }
+                                        });
+                                    }
+
+                                    periList.forEach(p => {
+                                        const pName = (p.name || '').trim();
+                                        if (pName && !allDevicesMap[pName.toLowerCase()]) {
+                                            allDevicesMap[pName.toLowerCase()] = {
+                                                name: pName,
+                                                type: p.type || 'Peripheral',
+                                                manufacturer: p.manufacturer || 'HP / Generic',
+                                                version: p.version || 'v1.0',
+                                                is_present: true
+                                            };
+                                        }
+                                    });
+
+                                    const deviceList = Object.values(allDevicesMap);
+
+                                    if (deviceList.length > 0) {
+                                        let listHtml = `<div style="display:flex; flex-direction:column; gap:8px;">` + deviceList.map(item => {
+                                            const dName = esc(item.name);
+                                            const dType = esc(item.type);
+                                            const dMftr = esc(item.manufacturer || 'OEM Vendor');
+                                            const dVer = esc(item.version || 'v1.0');
+                                            
+                                            return `<div style="padding:10px 14px; background:#ffffff; border:1px solid var(--border); border-radius:6px; font-size:13px; display:flex; align-items:center; justify-content:space-between;">
+                                                <div style="display:flex; align-items:center; gap:12px;">
+                                                    <span style="font-weight:600; color:var(--text-1);">${dName}</span>
+                                                    <span style="color:var(--muted); font-size:11px; background:var(--surface-2); padding:2px 8px; border-radius:4px;">${dType}</span>
+                                                </div>
+                                                <div style="display:flex; align-items:center; gap:8px;">
+                                                    <span style="font-size:11.5px; background:#f1f5f9; color:#334155; padding:3px 9px; border-radius:5px; border:1px solid #cbd5e1; font-weight:500;">
+                                                        <span style="color:var(--muted); font-size:10.5px; margin-right:3px;">Manufacturer:</span><b>${dMftr}</b>
+                                                    </span>
+                                                    <span style="font-size:11.5px; background:#f1f5f9; color:#334155; padding:3px 9px; border-radius:5px; border:1px solid #cbd5e1; font-weight:500;">
+                                                        <span style="color:var(--muted); font-size:10.5px; margin-right:3px;">Version:</span><b>${dVer}</b>
+                                                    </span>
+                                                </div>
+                                            </div>`;
+                                        }).join('') + `</div>`;
+                                        setHtml('specPeripherals', listHtml);
                                     } else {
                                         setTxt('specPeripherals', 'Integrated Display, Standard Keyboard & Mouse');
                                     }
 
 
-                                    // Categorize peripherals for Section 9 (External Connected Devices)
+                                    // Categorize peripherals strictly for Section 9 (LIVE External Connected Devices ONLY)
                                     let catPrinters = [];
                                     let catMice = [];
                                     let catKeyboards = [];
@@ -3024,11 +3106,34 @@
                                     let catStorage = [];
                                     let catOther = [];
 
+                                    // 1. Live Printers (ONLY if currently Online & Connected)
+                                    if (Array.isArray(data.printers)) {
+                                        data.printers.forEach(p => {
+                                            const pObj = typeof p === 'string' ? { name: p } : p;
+                                            const pName = (pObj.name || '').trim();
+                                            const pStatus = (pObj.extended_printer_status || pObj.status || '').toLowerCase();
+                                            if (!pName) return;
+                                            const nl = pName.toLowerCase();
+                                            if (nl.includes('onenote') || nl.includes('print to pdf') || nl.includes('fax') || nl.includes('xps document writer')) return;
+                                            
+                                            // Do NOT show offline / disconnected printers in Section 9
+                                            if (!pStatus.includes('offline') && !pStatus.includes('work offline')) {
+                                                if (!catPrinters.includes(pName)) catPrinters.push(pName);
+                                            }
+                                        });
+                                    }
+
+                                    // 2. Live Peripherals (ONLY if currently connected / physically plugged in)
                                     periList.forEach(p => {
                                         const name = (p.name || '').trim();
                                         if (!name) return;
                                         const type = (p.type || '').toLowerCase();
                                         const nl = name.toLowerCase();
+                                        const status = (p.status || '').toLowerCase();
+                                        const isPresent = p.is_present !== false && !status.includes('offline') && !status.includes('previously');
+
+                                        // Strict Live Filter: if not connected right now, don't show!
+                                        if (!isPresent) return;
 
                                         // Strict filter out virtual & built-in devices
                                         if (nl.includes('onenote') || nl.includes('print to pdf') || nl.includes('fax') || nl.includes('xps document writer')) return;
@@ -3036,13 +3141,17 @@
                                         if (nl.includes('vendor-defined') || nl.includes('radio controls') || nl.includes('virtual hid') || nl.includes('vhf') || nl.includes('system controller') || nl.includes('consumer control')) return;
 
                                         if (type === 'printer' || nl.includes('printer')) {
-                                            if (!catPrinters.includes(name)) catPrinters.push(name);
+                                            if (!status.includes('offline') && !catPrinters.includes(name)) catPrinters.push(name);
                                         } else if (type === 'mouse' || (nl.includes('mouse') && !nl.includes('touchpad'))) {
                                             if (!catMice.includes(name)) catMice.push(name);
                                         } else if (type === 'keyboard' || nl.includes('keyboard')) {
-                                            if (!catKeyboards.includes(name)) catKeyboards.push(name);
-                                        } else if (type === 'monitor' || (nl.includes('monitor') && !nl.includes('generic pnp') && !nl.includes('default monitor'))) {
-                                            if (!catMonitors.includes(name)) catMonitors.push(name);
+                                            if (!nl.includes('hid keyboard device') && !nl.includes('standard ps/2') && !nl.includes('enhanced (101-')) {
+                                                if (!catKeyboards.includes(name)) catKeyboards.push(name);
+                                            }
+                                        } else if (type === 'monitor' || nl.includes('hdmi') || nl.includes('displayport') || (nl.includes('monitor') && !nl.includes('generic pnp') && !nl.includes('default monitor'))) {
+                                            if (!nl.includes('atna40') && !nl.includes('internal') && !nl.match(/^(atn|sdc|boe|auo|lgd|shp|cmn|int)\d+/)) {
+                                                if (!catMonitors.includes(name)) catMonitors.push(name);
+                                            }
                                         } else if (type === 'storage' || type.includes('disk') || nl.includes('usb mass storage')) {
                                             if (!catStorage.includes(name)) catStorage.push(name);
                                         } else if (!nl.includes('hid-compliant device') && !nl.includes('usb input device')) {
@@ -3156,7 +3265,17 @@
                                     fetchLifecycleData(devMac, name, data, hw);
                                     fetchTicketsData(devMac, name, data, hw);
 
-                                    loginData = data.login_history || [];
+                                    let rawLogins = data.login_history || [];
+                                    let seenLogKeys = new Set();
+                                    loginData = [];
+                                    rawLogins.forEach(l => {
+                                        const key = `${(l.username || '').toLowerCase()}|${l.time || l.timestamp || ''}|${(l.logon_type || '').toLowerCase()}`;
+                                        if (!seenLogKeys.has(key)) {
+                                            seenLogKeys.add(key);
+                                            loginData.push(l);
+                                        }
+                                    });
+
                                     if (loginData.length === 0 && (data.user_accounts || []).length > 0) {
                                         loginData = (data.user_accounts || []).filter(u => u.last_login && u.last_login !== 'Never' && u.last_login !== 'Unknown').map(u => ({
                                             username: u.name,
@@ -3544,7 +3663,13 @@
 
                                     container.innerHTML = `<div style="display:flex; flex-direction:column; gap:8px; max-height:385px; overflow-y:auto; padding-right:6px; padding-bottom:8px; box-sizing:border-box;">
             ${networks.map(n => {
-                                        return `
+                const isSaved = n.has_saved_password || Boolean(savedWifiPasswords[n.ssid] || localStorage.getItem('wifi_pwd_' + n.ssid));
+                const savedCheckHtml = isSaved ? `
+                    <div title="Saved Password Remembered" style="display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; background:#10b981; color:#ffffff; font-size:12px; font-weight:bold; flex-shrink:0; box-shadow:0 2px 5px rgba(16,185,129,0.35);">
+                        ✓
+                    </div>` : '';
+
+                return `
                 <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 16px; background:var(--surface-2); border:1px solid var(--border); border-radius:8px; cursor:pointer; transition:all 0.15s;" 
                      onmouseover="this.style.borderColor='var(--primary-lt)'" 
                      onmouseout="this.style.borderColor='var(--border)'"
@@ -3555,9 +3680,10 @@
                             <div style="font-size:11px; color:var(--muted);">${esc(n.authentication || 'Open')} • ${esc(n.signal)} signal</div>
                         </div>
                     </div>
+                    ${savedCheckHtml}
                 </div>
                 `;
-                                    }).join('')}
+            }).join('')}
         </div>`;
                                 } catch (e) {
                                     container.innerHTML = `<div class="empty-state"><h3>Error</h3><p>${esc(e.message)}</p></div>`;

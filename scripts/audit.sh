@@ -206,17 +206,61 @@ if [ "$OS_NAME" = "macOS" ]; then
     [ -z "$BIOS_VERSION" ]  && BIOS_VERSION="Apple iBoot (Secure Boot)"
     [ -z "$MOBO_SERIAL" ]   && MOBO_SERIAL="$SERIAL_NUMBER"
 else
-    # Try sysfs dmi first (world-readable on Linux without root!)
+    # 1. If running inside WSL 2, query host hardware via powershell.exe!
+    if command -v powershell.exe >/dev/null 2>&1 && [ "$PYTHON3_OK" = "true" ]; then
+        eval $(python3 - 2>/dev/null <<'PYEOF'
+import subprocess, json
+
+try:
+    cmd = "Get-CimInstance Win32_ComputerSystemProduct | Select-Object Vendor, Name, IdentifyingNumber | ConvertTo-Json"
+    r = subprocess.run(["powershell.exe", "-Command", cmd], capture_output=True, text=True, timeout=5)
+    if r.returncode == 0 and r.stdout.strip():
+        data = json.loads(r.stdout)
+        v = data.get("Vendor","").strip()
+        n = data.get("Name","").strip()
+        s = data.get("IdentifyingNumber","").strip()
+        if v: print(f'MANUFACTURER="{v}"')
+        if n: print(f'MODEL_NAME="{n}"')
+        if s: print(f'SERIAL_NUMBER="{s}"')
+except Exception:
+    pass
+
+try:
+    cmd = "Get-CimInstance Win32_BaseBoard | Select-Object Manufacturer, Product, Version, SerialNumber | ConvertTo-Json"
+    r = subprocess.run(["powershell.exe", "-Command", cmd], capture_output=True, text=True, timeout=5)
+    if r.returncode == 0 and r.stdout.strip():
+        data = json.loads(r.stdout)
+        if data.get("Manufacturer"): print(f'MOBO_MANUFACTURER="{data.get("Manufacturer").strip()}"')
+        if data.get("Product"): print(f'MOBO_PRODUCT="{data.get("Product").strip()}"')
+        if data.get("Version"): print(f'MOBO_VERSION="{data.get("Version").strip()}"')
+        if data.get("SerialNumber"): print(f'MOBO_SERIAL="{data.get("SerialNumber").strip()}"')
+except Exception:
+    pass
+
+try:
+    cmd = "Get-CimInstance Win32_BIOS | Select-Object SMBIOSBIOSVersion, ReleaseDate | ConvertTo-Json"
+    r = subprocess.run(["powershell.exe", "-Command", cmd], capture_output=True, text=True, timeout=5)
+    if r.returncode == 0 and r.stdout.strip():
+        data = json.loads(r.stdout)
+        if data.get("SMBIOSBIOSVersion"): print(f'BIOS_VERSION="{data.get("SMBIOSBIOSVersion").strip()}"')
+        if data.get("ReleaseDate"): print(f'BIOS_DATE="{data.get("ReleaseDate").strip()}"')
+except Exception:
+    pass
+PYEOF
+        )
+    fi
+
+    # 2. Try sysfs dmi first (world-readable on Linux without root!)
     if [ -d /sys/class/dmi/id ]; then
-        [ -f /sys/class/dmi/id/product_serial ] && SERIAL_NUMBER=$(cat /sys/class/dmi/id/product_serial 2>/dev/null | tr -d '\0\r\n')
-        [ -f /sys/class/dmi/id/sys_vendor ]     && MANUFACTURER=$(cat /sys/class/dmi/id/sys_vendor 2>/dev/null | tr -d '\0\r\n')
-        [ -f /sys/class/dmi/id/product_name ]   && MODEL_NAME=$(cat /sys/class/dmi/id/product_name 2>/dev/null | tr -d '\0\r\n')
-        [ -f /sys/class/dmi/id/board_vendor ]   && MOBO_MANUFACTURER=$(cat /sys/class/dmi/id/board_vendor 2>/dev/null | tr -d '\0\r\n')
-        [ -f /sys/class/dmi/id/board_name ]     && MOBO_PRODUCT=$(cat /sys/class/dmi/id/board_name 2>/dev/null | tr -d '\0\r\n')
-        [ -f /sys/class/dmi/id/board_version ]  && MOBO_VERSION=$(cat /sys/class/dmi/id/board_version 2>/dev/null | tr -d '\0\r\n')
-        [ -f /sys/class/dmi/id/board_serial ]   && MOBO_SERIAL=$(cat /sys/class/dmi/id/board_serial 2>/dev/null | tr -d '\0\r\n')
-        [ -f /sys/class/dmi/id/bios_version ]   && BIOS_VERSION=$(cat /sys/class/dmi/id/bios_version 2>/dev/null | tr -d '\0\r\n')
-        [ -f /sys/class/dmi/id/bios_date ]      && BIOS_DATE=$(cat /sys/class/dmi/id/bios_date 2>/dev/null | tr -d '\0\r\n')
+        { [ "$SERIAL_NUMBER" = "Unknown" ] || [ -z "$SERIAL_NUMBER" ]; } && [ -f /sys/class/dmi/id/product_serial ] && SERIAL_NUMBER=$(cat /sys/class/dmi/id/product_serial 2>/dev/null | tr -d '\0\r\n')
+        { [ "$MANUFACTURER" = "Unknown" ] || [ -z "$MANUFACTURER" ]; }  && [ -f /sys/class/dmi/id/sys_vendor ]     && MANUFACTURER=$(cat /sys/class/dmi/id/sys_vendor 2>/dev/null | tr -d '\0\r\n')
+        { [ "$MODEL_NAME" = "Unknown" ] || [ -z "$MODEL_NAME" ]; }      && [ -f /sys/class/dmi/id/product_name ]   && MODEL_NAME=$(cat /sys/class/dmi/id/product_name 2>/dev/null | tr -d '\0\r\n')
+        { [ "$MOBO_MANUFACTURER" = "Unknown" ] || [ -z "$MOBO_MANUFACTURER" ]; } && [ -f /sys/class/dmi/id/board_vendor ] && MOBO_MANUFACTURER=$(cat /sys/class/dmi/id/board_vendor 2>/dev/null | tr -d '\0\r\n')
+        { [ "$MOBO_PRODUCT" = "Unknown" ] || [ -z "$MOBO_PRODUCT" ]; }     && [ -f /sys/class/dmi/id/board_name ]     && MOBO_PRODUCT=$(cat /sys/class/dmi/id/board_name 2>/dev/null | tr -d '\0\r\n')
+        { [ "$MOBO_VERSION" = "Unknown" ] || [ -z "$MOBO_VERSION" ]; }     && [ -f /sys/class/dmi/id/board_version ]  && MOBO_VERSION=$(cat /sys/class/dmi/id/board_version 2>/dev/null | tr -d '\0\r\n')
+        { [ "$MOBO_SERIAL" = "Unknown" ] || [ -z "$MOBO_SERIAL" ]; }       && [ -f /sys/class/dmi/id/board_serial ]   && MOBO_SERIAL=$(cat /sys/class/dmi/id/board_serial 2>/dev/null | tr -d '\0\r\n')
+        { [ "$BIOS_VERSION" = "Unknown" ] || [ -z "$BIOS_VERSION" ]; }     && [ -f /sys/class/dmi/id/bios_version ]   && BIOS_VERSION=$(cat /sys/class/dmi/id/bios_version 2>/dev/null | tr -d '\0\r\n')
+        { [ "$BIOS_DATE" = "Unknown" ] || [ -z "$BIOS_DATE" ]; }        && [ -f /sys/class/dmi/id/bios_date ]      && BIOS_DATE=$(cat /sys/class/dmi/id/bios_date 2>/dev/null | tr -d '\0\r\n')
     fi
     
     # Fallback to dmidecode if sysfs values were empty/Unknown
