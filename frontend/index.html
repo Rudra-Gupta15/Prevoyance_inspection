@@ -2445,7 +2445,7 @@
                                 if (!ipRange) { alert('Please enter a valid IP range.'); return; }
 
                                 btn.disabled = true;
-                                btn.textContent = '⏳ Scanning…';
+                                btn.textContent = 'Scanning...';
                                 document.getElementById('scanStatus').style.display = 'block';
                                 document.getElementById('scanResults').style.display = 'block';
 
@@ -2503,7 +2503,7 @@
 
                                                         appendDiscoveredDeviceRow(d, ipRange);
                                                     } else if (event.type === 'complete') {
-                                                        summary.innerHTML = `✅ <b>Scan Complete</b>: Discovered <b>${event.total}</b> live device${event.total !== 1 ? 's' : ''} out of <b>${event.scanned || 254}</b> hosts scanned in <b>${esc(ipRange)}</b>.`;
+                                                        summary.innerHTML = `<b>Scan Complete</b>: Discovered <b>${event.total}</b> live device${event.total !== 1 ? 's' : ''} out of <b>${event.scanned || 254}</b> hosts scanned in <b>${esc(ipRange)}</b>.`;
                                                         const wifiMeta = document.getElementById('wifiScanMeta');
                                                         if (wifiMeta) wifiMeta.textContent = `${event.total} devices on ${ipRange}`;
                                                         setGlobalStatus('ok', `Found ${event.total} devices`);
@@ -2516,8 +2516,8 @@
                                     }
 
                                     if (scanData.length === 0) {
-                                        if (tbody1) tbody1.innerHTML = `<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">📡</div><h3>No devices found</h3><p>No live hosts detected in ${esc(ipRange)}.</p></div></td></tr>`;
-                                        if (tbody2) tbody2.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">📡</div><h3>No devices found</h3><p>No live hosts detected in ${esc(ipRange)}.</p></div></td></tr>`;
+                                        if (tbody1) tbody1.innerHTML = `<tr><td colspan="6"><div class="empty-state"><div class="empty-icon"></div><h3>No devices found</h3><p>No live hosts detected in ${esc(ipRange)}.</p></div></td></tr>`;
+                                        if (tbody2) tbody2.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="empty-icon"></div><h3>No devices found</h3><p>No live hosts detected in ${esc(ipRange)}.</p></div></td></tr>`;
                                         summary.textContent = `No devices found in ${ipRange}`;
                                     }
                                 } catch (e) {
@@ -2526,7 +2526,7 @@
                                 } finally {
                                     document.getElementById('scanStatus').style.display = 'none';
                                     btn.disabled = false;
-                                    btn.innerHTML = '🔍 &nbsp;Start Scan';
+                                    btn.innerHTML = 'Start Scan';
                                 }
                             }
 
@@ -2545,7 +2545,7 @@
                                         <td><span class="badge badge-blue">${esc(d.device_type)}</span></td>
                                         <td>
                                             <button class="btn btn-outline btn-sm" onclick="registerDiscoveredAsset('${esc(d.ip)}','${esc(d.computer_name || d.hostname)}','${esc(d.device_type)}')">
-                                                ➕ Register
+                                                Register
                                             </button>
                                         </td>
                                     `;
@@ -2569,13 +2569,7 @@
                                         : `<span style="color:var(--muted);">${esc(d.username || 'Unaudited Target')}</span>`;
 
                                     const hostname = d.computer_name || d.hostname || d.ip;
-                                    let osIcon = '';
-                                    let osLower = (d.os_name || '').toLowerCase();
-                                    if (osLower.includes('windows')) osIcon = '🪟';
-                                    else if (osLower.includes('mac')) osIcon = '🍎';
-                                    else if (osLower.includes('ubuntu') || osLower.includes('linux')) osIcon = '🐧';
-
-                                    const osHtml = osIcon ? `<span style="font-weight:500;">${osIcon} &nbsp;${esc(d.os_name || 'Network Target')}</span>` : `<span style="font-weight:500;">${esc(d.os_name || 'Network Target')}</span>`;
+                                    const osHtml = `<span style="font-weight:500;">${esc(d.os_name || 'Network Target')}</span>`;
 
                                     const actionBtn = isAudited
                                         ? `<div style="display:flex; gap:6px;">
