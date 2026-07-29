@@ -575,7 +575,6 @@
     <div class="app-layout">
         <aside class="sidebar">
             <div class="brand">
-                <div class="brand-icon">🛡️</div>
                 <div>
                     <div class="brand-name">Infra-Pulse</div>
                     <div class="brand-sub">IT Compliance &amp; Discovery Portal</div>
@@ -583,38 +582,31 @@
             </div>
 
             <nav class="tab-nav" role="tablist">
-                <button class="tab-btn active" role="tab" data-tab="audit" id="btn-audit" onclick="switchTab('audit')">
-                    <span class="tab-icon">🛡️</span>
+                <button class="tab-btn" role="tab" data-tab="audit" id="btn-audit" onclick="switchTab('audit')" style="display:none;">
                     <span class="tab-label">Compliance Audit</span>
                 </button>
 
-                <button class="tab-btn" role="tab" data-tab="discovery" id="btn-discovery"
+                <button class="tab-btn active" role="tab" data-tab="discovery" id="btn-discovery"
                     onclick="switchTab('discovery')">
-                    <span class="tab-icon">🔎</span>
                     <span class="tab-label">Info Gathering</span>
                 </button>
                 <button class="tab-btn" role="tab" data-tab="software" id="btn-software"
                     onclick="switchTab('software')">
-                    <span class="tab-icon">💻</span>
                     <span class="tab-label">Device Audits</span>
                 </button>
                 <button class="tab-btn" role="tab" data-tab="wifi" id="btn-wifi" onclick="switchTab('wifi')">
-                    <span class="tab-icon">📡</span>
                     <span class="tab-label">WiFi Dashboard</span>
                 </button>
                 <button class="tab-btn" role="tab" data-tab="alldevices" id="btn-alldevices"
                     onclick="switchTab('alldevices')">
-                    <span class="tab-icon">🌐</span>
                     <span class="tab-label">All Devices</span>
                 </button>
                 <button class="tab-btn" role="tab" data-tab="terminal" id="btn-terminal"
                     onclick="switchTab('terminal')">
-                    <span class="tab-icon">⚡</span>
                     <span class="tab-label">Terminal Command</span>
                 </button>
                 <button class="tab-btn" role="tab" data-tab="settings" id="btn-settings"
                     onclick="switchTab('settings')">
-                    <span class="tab-icon">⚙️</span>
                     <span class="tab-label">Settings</span>
                 </button>
             </nav>
@@ -623,7 +615,6 @@
                 <div class="secure-box">
                     <h4>Secure. Reliable.<br>Compliant.</h4>
                     <p>Automated device discovery and compliance auditing made simple.</p>
-                    <span class="shield-icon">🛡️</span>
                 </div>
             </div>
         </aside>
@@ -631,15 +622,14 @@
         <div class="main-wrapper">
             <div class="topbar">
                 <div>
-                    <div class="topbar-title" id="pageTitle">Compliance Audit</div>
-                    <div class="topbar-subtitle" id="pageSubtitle">Discover, Audit &amp; Ensure Compliance</div>
+                    <div class="topbar-title" id="pageTitle">Info Gathering</div>
+                    <div class="topbar-subtitle" id="pageSubtitle">Network Device Discovery</div>
                 </div>
                 <div class="topbar-right">
                     <div class="header-badge" id="globalStatus">
                         <span class="badge-dot" id="globalDot"></span>
                         <span id="globalStatusText">Standby</span>
                     </div>
-                    <div style="cursor: pointer; font-size: 16px;">❓</div>
                     <div class="user-profile">SL</div>
                 </div>
             </div>
@@ -647,7 +637,7 @@
             <main class="main-content">
 
                 <!-- TAB 1: COMPLIANCE AUDIT -->
-                <div class="tab-panel active" id="panel-audit" role="tabpanel">
+                <div class="tab-panel" id="panel-audit" role="tabpanel">
                     <div style="display: none; grid-template-columns: repeat(4, 1fr); gap: 24px; margin-bottom: 32px;">
                         <div class="card" style="display:flex; align-items:center; gap:16px; padding:20px;">
                             <div class="card-icon blue" style="width:48px;height:48px;border-radius:50%;font-size:24px;">💻</div>
@@ -949,12 +939,11 @@
                 </div>
 
                 <!-- TAB 3: NETWORK DISCOVERY -->
-                <div class="tab-panel" id="panel-discovery" role="tabpanel">
+                <div class="tab-panel active" id="panel-discovery" role="tabpanel">
 
                     <div class="card" style="margin-bottom:20px; background:var(--surface-2); border-left:4px solid var(--primary); padding:16px 20px;">
                         <div style="display:flex; align-items:center; justify-content:space-between; cursor:pointer;" onclick="toggleHowToUseInfo()">
                             <div style="display:flex; align-items:center; gap:12px;">
-                                <span style="font-size:20px;">💡</span>
                                 <div>
                                     <b style="color:var(--text-1); font-size:14px;">How to Use the Network Scanner</b>
                                     <div style="font-size:12px; color:var(--text-2);">Follow these simple steps to discover, inspect, and audit network devices</div>
@@ -975,7 +964,7 @@
                                 </div>
                                 <div style="background:var(--surface); padding:14px; border-radius:8px; border:1px solid var(--border);">
                                     <div style="font-size:11px; font-weight:700; color:var(--primary); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;">Step 3: Run Discovery</div>
-                                    <div style="font-size:13px; color:var(--text-2); line-height:1.5;">Click <b>🔍 Start Scan</b>. Parallel multi-threading will find live hosts and open ports in seconds.</div>
+                                    <div style="font-size:13px; color:var(--text-2); line-height:1.5;">Click <b>Start Scan</b>. Parallel multi-threading will find live hosts and open ports in seconds.</div>
                                 </div>
                                 <div style="background:var(--surface); padding:14px; border-radius:8px; border:1px solid var(--border);">
                                     <div style="font-size:11px; font-weight:700; color:var(--primary); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;">Step 4: Inspect &amp; Audit</div>
@@ -987,7 +976,6 @@
 
                     <div class="card" style="margin-bottom:24px;">
                         <div class="card-header">
-                            <div class="card-icon blue">🔍</div>
                             <div>
                                 <div class="card-title">Network Scanner</div>
                                 <div class="card-subtitle">Discover live devices via port scanning — no agents required</div>
@@ -995,7 +983,7 @@
                         </div>
 
                         <div class="alert alert-info">
-                            ℹ️ Scans check ports: <b>SSH (22), Telnet (23), HTTP (80), RPC (135), HTTPS (443), SMB (445), RDP (3389), HTTP-Alt (8080), Printer (9100)</b>. Limit to <code>/24</code> subnets for best performance.
+                            Scans check ports: <b>SSH (22), Telnet (23), HTTP (80), RPC (135), HTTPS (443), SMB (445), RDP (3389), HTTP-Alt (8080), Printer (9100)</b>. Limit to <code>/24</code> subnets for best performance.
                         </div>
 
                         <div style="display:flex; gap:16px; align-items:flex-end; flex-wrap:wrap;">
@@ -1022,7 +1010,7 @@
                             </div>
                             <div>
                                 <button class="btn btn-primary btn-lg" id="scanBtn" onclick="startNetworkScan()">
-                                    🔍 &nbsp;Start Scan
+                                    Start Scan
                                 </button>
                             </div>
                         </div>
@@ -1043,7 +1031,7 @@
                                     <div class="card-title">Discovered Devices</div>
                                     <div class="card-subtitle" id="scanSummary">—</div>
                                 </div>
-                                <button class="btn btn-outline btn-sm" onclick="exportScanResults()">📤 Export CSV</button>
+                                <button class="btn btn-outline btn-sm" onclick="exportScanResults()">Export CSV</button>
                             </div>
 
                             <div class="table-wrap">
@@ -1072,7 +1060,6 @@
 
                     <div class="card" style="margin-bottom:24px;">
                         <div class="card-header">
-                            <div class="card-icon purple">🖥️</div>
                             <div>
                                 <div class="card-title">Device Audits</div>
                                 <div class="card-subtitle">Browse hardware specs and installed software from audited devices</div>
@@ -1087,7 +1074,7 @@
                                 </select>
                             </div>
                             <div style="display:flex; gap:10px;">
-                                <button class="btn btn-outline" onclick="refreshDeviceList()">🔄 Refresh Devices</button>
+                                <button class="btn btn-outline" onclick="refreshDeviceList()">Refresh Devices</button>
                             </div>
                         </div>
                     </div>
@@ -1101,20 +1088,20 @@
                                 </div>
                                 <div style="display:flex; gap:10px; align-items:center;">
                                     <button class="btn btn-outline btn-sm" id="forceScanBtn" onclick="triggerImmediateScan()" title="Trigger immediate background scan on this device">
-                                        ⚡ Force Immediate Audit
+                                        Force Immediate Audit
                                     </button>
                                     <button class="btn btn-primary btn-sm" onclick="downloadDeviceReport()" title="Download full audit report as PDF" style="gap:6px;">
-                                        📄 Download PDF Report
+                                        Download PDF Report
                                     </button>
                                     <span class="badge badge-green" id="swLicenseStatus">Licensed</span>
                                 </div>
                             </div>
 
                             <div style="display:flex; gap:12px; border-top:1px solid var(--border); padding-top:16px; flex-wrap:wrap;">
-                                <button class="btn btn-outline dev-tab-btn" id="dev-btn-hardware" onclick="switchDeviceTab('hardware')" style="background:var(--surface-3); border-color:var(--primary); color:var(--primary);">🖥 Hardware</button>
-                                <button class="btn btn-outline dev-tab-btn" id="dev-btn-software" onclick="switchDeviceTab('software')" style="border-color:transparent; color:var(--text-2);">💻 Software &amp; Users</button>
-                                <button class="btn btn-outline dev-tab-btn" id="dev-btn-assets" onclick="switchDeviceTab('assets')" style="border-color:transparent; color:var(--text-2);">📋 Lifecycle &amp; Procurement</button>
-                                <button class="btn btn-outline dev-tab-btn" id="dev-btn-tickets" onclick="switchDeviceTab('tickets')" style="border-color:transparent; color:var(--text-2);">🎟️ Tickets &amp; ITSM</button>
+                                <button class="btn btn-outline dev-tab-btn" id="dev-btn-hardware" onclick="switchDeviceTab('hardware')" style="background:var(--surface-3); border-color:var(--primary); color:var(--primary);">Hardware</button>
+                                <button class="btn btn-outline dev-tab-btn" id="dev-btn-software" onclick="switchDeviceTab('software')" style="border-color:transparent; color:var(--text-2);">Software &amp; Users</button>
+                                <button class="btn btn-outline dev-tab-btn" id="dev-btn-assets" onclick="switchDeviceTab('assets')" style="border-color:transparent; color:var(--text-2);">Lifecycle &amp; Procurement</button>
+                                <button class="btn btn-outline dev-tab-btn" id="dev-btn-tickets" onclick="switchDeviceTab('tickets')" style="border-color:transparent; color:var(--text-2);">Tickets &amp; ITSM</button>
                             </div>
                         </div>
 
@@ -1124,7 +1111,7 @@
                                 <div style="display:flex; flex-direction:column; gap: 24px;">
 
                                     <div style="background: #ffffff; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px; box-shadow: var(--shadow-sm);">
-                                        <div class="card-title" style="margin-bottom:14px; font-size:15px; font-weight:700; display:flex; align-items:center; gap:8px; color:var(--primary);">🖥️ 1. System &amp; General Overview</div>
+                                        <div class="card-title" style="margin-bottom:14px; font-size:15px; font-weight:700; display:flex; align-items:center; gap:8px; color:var(--primary);">1. System &amp; General Overview</div>
                                         <div style="display:grid; grid-template-columns: max-content max-content 1fr; gap: 10px 16px; background: #f8fafc; padding: 18px; border-radius: 8px; font-size:13.5px;">
                                             <span style="color:var(--muted); font-weight:600;">Hostname</span><span>=</span><span id="specHostname" style="color:var(--text-1); font-weight:600;">—</span>
                                             <span style="color:var(--muted); font-weight:600;">Device Type</span><span>=</span><span id="specDeviceType" style="color:var(--text-1);">—</span>
@@ -1139,7 +1126,7 @@
                                     </div>
 
                                     <div style="background: #ffffff; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px; box-shadow: var(--shadow-sm);">
-                                        <div class="card-title" style="margin-bottom:14px; font-size:15px; font-weight:700; display:flex; align-items:center; gap:8px; color:var(--primary);">⚙️ 2. Operating System &amp; Firmware</div>
+                                        <div class="card-title" style="margin-bottom:14px; font-size:15px; font-weight:700; display:flex; align-items:center; gap:8px; color:var(--primary);">2. Operating System &amp; Firmware</div>
                                         <div style="display:grid; grid-template-columns: max-content max-content 1fr; gap: 10px 16px; background: #f8fafc; padding: 18px; border-radius: 8px; font-size:13.5px;">
                                             <span style="color:var(--muted); font-weight:600;">Operating System</span><span>=</span><span id="specOsHw" style="color:var(--text-1);">—</span>
                                             <span style="color:var(--muted); font-weight:600;">License Status</span><span>=</span><span id="specLicenseHw" style="color:var(--text-1);">—</span>
@@ -1150,7 +1137,7 @@
                                     </div>
 
                                     <div style="background: #ffffff; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px; box-shadow: var(--shadow-sm);">
-                                        <div class="card-title" style="margin-bottom:14px; font-size:15px; font-weight:700; display:flex; align-items:center; gap:8px; color:var(--primary);">⚡ 3. Processor &amp; Memory (CPU &amp; RAM)</div>
+                                        <div class="card-title" style="margin-bottom:14px; font-size:15px; font-weight:700; display:flex; align-items:center; gap:8px; color:var(--primary);">3. Processor &amp; Memory (CPU &amp; RAM)</div>
                                         <div style="display:grid; grid-template-columns: max-content max-content 1fr; gap: 10px 16px; background: #f8fafc; padding: 18px; border-radius: 8px; font-size:13.5px;">
                                             <span style="color:var(--muted); font-weight:600;">Processor (CPU)</span><span>=</span><span id="specCpu" style="color:var(--text-1);">—</span>
                                             <span style="color:var(--muted); font-weight:600;">CPU Cores / Threads</span><span>=</span><span id="specCores" style="color:var(--text-1);">—</span>
@@ -1160,14 +1147,14 @@
                                     </div>
 
                                     <div style="background: #ffffff; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px; box-shadow: var(--shadow-sm);">
-                                        <div class="card-title" style="margin-bottom:14px; font-size:15px; font-weight:700; display:flex; align-items:center; gap:8px; color:var(--primary);">💾 4. Storage &amp; Disk Partitions</div>
+                                        <div class="card-title" style="margin-bottom:14px; font-size:15px; font-weight:700; display:flex; align-items:center; gap:8px; color:var(--primary);">4. Storage &amp; Disk Partitions</div>
                                         <div style="display:grid; grid-template-columns: max-content max-content 1fr; gap: 10px 16px; background: #f8fafc; padding: 18px; border-radius: 8px; font-size:13.5px;">
                                             <span style="color:var(--muted); font-weight:600;">Storage Drives</span><span>=</span><span id="specDisk" style="color:var(--text-1);">—</span>
                                         </div>
                                     </div>
 
                                     <div style="background: #ffffff; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px; box-shadow: var(--shadow-sm);">
-                                        <div class="card-title" style="margin-bottom:14px; font-size:15px; font-weight:700; display:flex; align-items:center; gap:8px; color:var(--primary);">🌐 5. Network Adapters &amp; Configuration</div>
+                                        <div class="card-title" style="margin-bottom:14px; font-size:15px; font-weight:700; display:flex; align-items:center; gap:8px; color:var(--primary);">5. Network Adapters &amp; Configuration</div>
                                         <div style="display:grid; grid-template-columns: max-content max-content 1fr; gap: 10px 16px; background: #f8fafc; padding: 18px; border-radius: 8px; font-size:13.5px;">
                                             <span style="color:var(--muted); font-weight:600;">Network Configuration</span><span>=</span><span id="specNetConfig" style="color:var(--text-1);">—</span>
                                             <span style="color:var(--muted); font-weight:600;">Network Hardware</span><span>=</span><span id="specNetHardware" style="color:var(--text-1);">—</span>
@@ -1175,21 +1162,21 @@
                                     </div>
 
                                     <div style="background: #ffffff; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px; box-shadow: var(--shadow-sm);">
-                                        <div class="card-title" style="margin-bottom:14px; font-size:15px; font-weight:700; display:flex; align-items:center; gap:8px; color:var(--primary);">🎮 6. Graphics &amp; Video Controllers (GPU)</div>
+                                        <div class="card-title" style="margin-bottom:14px; font-size:15px; font-weight:700; display:flex; align-items:center; gap:8px; color:var(--primary);">6. Graphics &amp; Video Controllers (GPU)</div>
                                         <div style="display:grid; grid-template-columns: max-content max-content 1fr; gap: 10px 16px; background: #f8fafc; padding: 18px; border-radius: 8px; font-size:13.5px;">
                                             <span style="color:var(--muted); font-weight:600;">GPU Details</span><span>=</span><span id="specGpu" style="color:var(--text-1);">—</span>
                                         </div>
                                     </div>
 
                                     <div style="background: #ffffff; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px; box-shadow: var(--shadow-sm);">
-                                        <div class="card-title" style="margin-bottom:14px; font-size:15px; font-weight:700; display:flex; align-items:center; gap:8px; color:var(--primary);">⌨️ 7. Peripherals &amp; Hardware</div>
+                                        <div class="card-title" style="margin-bottom:14px; font-size:15px; font-weight:700; display:flex; align-items:center; gap:8px; color:var(--primary);">7. Peripherals &amp; Hardware</div>
                                         <div style="display:grid; grid-template-columns: max-content max-content 1fr; gap: 10px 16px; background: #f8fafc; padding: 18px; border-radius: 8px; font-size:13.5px;">
                                             <span style="color:var(--muted); font-weight:600;">Peripherals</span><span>=</span><span id="specPeripherals" style="color:var(--text-1);">—</span>
                                         </div>
                                     </div>
 
                                     <div style="background: #ffffff; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px; box-shadow: var(--shadow-sm);">
-                                        <div class="card-title" style="margin-bottom:14px; font-size:15px; font-weight:700; display:flex; align-items:center; gap:8px; color:var(--primary);">🕒 8. System Timestamps &amp; Diagnostics</div>
+                                        <div class="card-title" style="margin-bottom:14px; font-size:15px; font-weight:700; display:flex; align-items:center; gap:8px; color:var(--primary);">8. System Timestamps &amp; Diagnostics</div>
                                         <div style="display:grid; grid-template-columns: max-content max-content 1fr; gap: 10px 16px; background: #f8fafc; padding: 18px; border-radius: 8px; font-size:13.5px;">
                                             <span style="color:var(--muted); font-weight:600;">System Timestamps</span><span>=</span><span id="specTimestamps" style="color:var(--text-1);">—</span>
                                             <span style="color:var(--muted); font-weight:600;">Battery Diagnostics</span><span>=</span><span id="specBattery" style="color:var(--text-1);">—</span>
@@ -1197,7 +1184,7 @@
                                     </div>
 
                                     <div style="background: #ffffff; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px; box-shadow: var(--shadow-sm);">
-                                        <div class="card-title" style="margin-bottom:14px; font-size:15px; font-weight:700; display:flex; align-items:center; gap:8px; color:var(--primary);">🔌 9. External Connected Devices</div>
+                                        <div class="card-title" style="margin-bottom:14px; font-size:15px; font-weight:700; display:flex; align-items:center; gap:8px; color:var(--primary);">9. External Connected Devices</div>
                                         <div style="display:grid; grid-template-columns: max-content max-content 1fr; gap: 10px 16px; background: #f8fafc; padding: 18px; border-radius: 8px; font-size:13.5px;">
                                             <span style="color:var(--muted); font-weight:600;">Printers</span><span>=</span><span id="specPripheralsPrinters" style="color:var(--text-1);">—</span>
                                             <span style="color:var(--muted); font-weight:600;">Mouse</span><span>=</span><span id="specPripheralsMouse" style="color:var(--text-1);">—</span>
@@ -1209,7 +1196,7 @@
                                     </div>
 
                                     <div style="background: #ffffff; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px; box-shadow: var(--shadow-sm);">
-                                        <div class="card-title" style="margin-bottom:14px; font-size:15px; font-weight:700; display:flex; align-items:center; gap:8px; color:var(--primary);">🔗 10. Cross-Connection &amp; Port Topology Status</div>
+                                        <div class="card-title" style="margin-bottom:14px; font-size:15px; font-weight:700; display:flex; align-items:center; gap:8px; color:var(--primary);">10. Cross-Connection &amp; Port Topology Status</div>
                                         <div style="display:grid; grid-template-columns: max-content max-content 1fr; gap: 10px 16px; background: #f8fafc; padding: 18px; border-radius: 8px; font-size:13.5px;">
                                             <span style="color:var(--muted); font-weight:600;">Inter-Device Cross Contact</span><span>=</span><span id="specCrossConnection" style="color:var(--text-1);">—</span>
                                         </div>
@@ -1586,20 +1573,18 @@
                         <div class="card">
                             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;">
                                 <div class="card-header" style="margin:0;">
-                                    <div class="card-icon blue">📡</div>
                                     <div>
                                         <div class="card-title">Available WiFi Networks</div>
                                         <div class="card-subtitle" id="networkListMeta">Click Refresh to scan nearby networks</div>
                                     </div>
                                 </div>
                                 <button class="btn btn-outline btn-sm" id="refreshNetworksBtn" onclick="refreshWifiNetworks()">
-                                    🔄 Refresh
+                                    Refresh
                                 </button>
                             </div>
 
                             <div id="networkListContainer">
                                 <div class="empty-state" style="padding:40px 16px;">
-                                    <div class="empty-icon">📡</div>
                                     <h3>No networks scanned yet</h3>
                                     <p>Click Refresh to discover nearby WiFi networks.</p>
                                 </div>
@@ -1608,7 +1593,7 @@
 
                         <div>
                             <div class="card" style="margin-bottom:16px; padding:20px;" id="wifiStatusCard">
-                                <div class="section-title" style="margin-bottom:10px;">📶 Current Connection</div>
+                                <div class="section-title" style="margin-bottom:10px;">Current Connection</div>
                                 <div id="wifiCurrentStatus">
                                     <div style="display:flex; align-items:center; gap:10px;">
                                         <span class="dot dot-orange dot-pulse"></span>
@@ -1619,7 +1604,6 @@
 
                             <div class="card" style="padding:20px;">
                                 <div class="card-header" style="margin-bottom:16px;">
-                                    <div class="card-icon green">⚡</div>
                                     <div>
                                         <div class="card-title" style="font-size:14px;">Connect to Network</div>
                                     </div>
@@ -1640,18 +1624,18 @@
                                                 oninput="if(this.value.length>=8){ persistWifiPassword(document.getElementById('connectSsid').value.trim(), this.value); }"
                                                 placeholder="Enter network password…" style="padding-right:44px;">
                                             <button onclick="togglePwd()" id="pwdToggle" style="position:absolute; right:10px; top:50%; transform:translateY(-50%);
-                                           background:none; border:none; cursor:pointer; font-size:16px;
+                                           background:none; border:none; cursor:pointer; font-size:12px; font-weight:600;
                                            color:var(--muted); padding:2px;">
-                                                👁️
+                                                Show
                                             </button>
                                         </div>
                                         <div id="savedPwdNote" style="display:none; margin-top:5px; font-size:12px; color:var(--success); font-weight:500;">
-                                            💾 Saved password remembered
+                                            Saved password remembered
                                         </div>
                                     </div>
 
                                     <button class="btn btn-primary btn-full" id="connectWifiBtn" onclick="connectToWifi()">
-                                        🔗 &nbsp;Connect &amp; Scan Network
+                                        Connect &amp; Scan Network
                                     </button>
 
                                     <div id="connectStatus" style="display:none;"></div>
@@ -1669,16 +1653,15 @@
                                 </div>
                                 <div style="display:flex; gap:10px; align-items:center;">
                                     <button class="btn btn-outline btn-sm" id="rescanBtn" onclick="rescanWifiDevices()">
-                                        🔄 Re-scan
+                                        Re-scan
                                     </button>
                                     <button class="btn btn-outline btn-sm" onclick="exportWifiCSV()">
-                                        📤 Export CSV
+                                        Export CSV
                                     </button>
                                 </div>
                             </div>
 
                             <div class="search-wrap" style="margin-bottom:16px;">
-                                <span class="search-icon">🔍</span>
                                 <input type="text" class="input-field search-input" id="wifiDeviceSearch" placeholder="Filter by IP, hostname, username, OS…" oninput="filterWifiDevices()">
                             </div>
 
@@ -1779,14 +1762,13 @@
                     <div class="card">
                         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;">
                             <div class="card-header" style="margin-bottom:0;">
-                                <div class="card-icon blue">💻</div>
                                 <div>
                                     <div class="card-title">All Audited Devices</div>
                                     <div class="card-subtitle">Historical inventory of every device that has ever completed a compliance audit.</div>
                                 </div>
                             </div>
                             <button class="btn btn-outline" onclick="loadAllDevices()">
-                                🔄 Refresh List
+                                Refresh List
                             </button>
                         </div>
 
@@ -1815,7 +1797,6 @@
                 <div class="tab-panel" id="panel-terminal" role="tabpanel">
                     <div class="card" style="margin-bottom: 24px; border-top: 4px solid var(--primary);">
                         <div class="card-header" style="margin-bottom:16px;">
-                            <div class="card-icon blue">💻</div>
                             <div>
                                 <div class="card-title">Terminal Audit Deployment Commands</div>
                                 <div class="card-subtitle">Generate, customize, copy, and save command-line audit execution triggers for workstations.</div>
@@ -1832,8 +1813,8 @@
                                 <input type="text" id="termServerPort" class="input-field" value="8000" placeholder="8000" oninput="updateTerminalCommands()">
                             </div>
                             <div style="display:flex; gap:10px;">
-                                <button class="btn btn-primary" id="btnSaveTermConfig" onclick="saveTerminalCommands()">💾 Save Configuration</button>
-                                <button class="btn btn-outline" onclick="resetTerminalCommands()">🔄 Reset Defaults</button>
+                                <button class="btn btn-primary" id="btnSaveTermConfig" onclick="saveTerminalCommands()">Save Configuration</button>
+                                <button class="btn btn-outline" onclick="resetTerminalCommands()">Reset Defaults</button>
                             </div>
                         </div>
                     </div>
@@ -1842,7 +1823,6 @@
 
                         <div class="card">
                             <div class="card-header" style="margin-bottom:18px;">
-                                <div class="card-icon green">💻</div>
                                 <div>
                                     <div class="card-title" style="font-size:16px;">1. Self Laptop (Local Host)</div>
                                     <div class="card-subtitle">Run locally on this machine (using localhost / 127.0.0.1)</div>
@@ -1855,9 +1835,9 @@
                                         <span class="dot-red"></span>
                                         <span class="dot-yellow"></span>
                                         <span class="dot-green"></span>
-                                        <span class="terminal-title">🪟 Windows (PowerShell)</span>
+                                        <span class="terminal-title">Windows (PowerShell)</span>
                                     </div>
-                                    <button class="btn btn-term-copy" id="btnCopySelfWin" onclick="copyTerminalCmd('cmdSelfWin', 'btnCopySelfWin')">📋 1-Click Copy</button>
+                                    <button class="btn btn-term-copy" id="btnCopySelfWin" onclick="copyTerminalCmd('cmdSelfWin', 'btnCopySelfWin')">1-Click Copy</button>
                                 </div>
                                 <textarea id="cmdSelfWin" class="terminal-textarea" spellcheck="false"></textarea>
                             </div>
@@ -1868,9 +1848,9 @@
                                         <span class="dot-red"></span>
                                         <span class="dot-yellow"></span>
                                         <span class="dot-green"></span>
-                                        <span class="terminal-title">🍎 / 🐧 macOS & Linux (Bash)</span>
+                                        <span class="terminal-title">macOS &amp; Linux (Bash)</span>
                                     </div>
-                                    <button class="btn btn-term-copy" id="btnCopySelfMac" onclick="copyTerminalCmd('cmdSelfMac', 'btnCopySelfMac')">📋 1-Click Copy</button>
+                                    <button class="btn btn-term-copy" id="btnCopySelfMac" onclick="copyTerminalCmd('cmdSelfMac', 'btnCopySelfMac')">1-Click Copy</button>
                                 </div>
                                 <textarea id="cmdSelfMac" class="terminal-textarea" spellcheck="false" oninput="autoResizeTerminalTextareas()"></textarea>
                             </div>
@@ -1878,7 +1858,6 @@
 
                         <div class="card">
                             <div class="card-header" style="margin-bottom:18px;">
-                                <div class="card-icon purple">🌐</div>
                                 <div>
                                     <div class="card-title" style="font-size:16px;">2. Another Laptop (Network / Remote)</div>
                                     <div class="card-subtitle">Run on client laptops connected via WiFi / Office LAN</div>
@@ -1891,9 +1870,9 @@
                                         <span class="dot-red"></span>
                                         <span class="dot-yellow"></span>
                                         <span class="dot-green"></span>
-                                        <span class="terminal-title">🪟 Windows (PowerShell)</span>
+                                        <span class="terminal-title">Windows (PowerShell)</span>
                                     </div>
-                                    <button class="btn btn-term-copy" id="btnCopyRemoteWin" onclick="copyTerminalCmd('cmdRemoteWin', 'btnCopyRemoteWin')">📋 1-Click Copy</button>
+                                    <button class="btn btn-term-copy" id="btnCopyRemoteWin" onclick="copyTerminalCmd('cmdRemoteWin', 'btnCopyRemoteWin')">1-Click Copy</button>
                                 </div>
                                 <textarea id="cmdRemoteWin" class="terminal-textarea" spellcheck="false" oninput="autoResizeTerminalTextareas()"></textarea>
                             </div>
@@ -1904,9 +1883,9 @@
                                         <span class="dot-red"></span>
                                         <span class="dot-yellow"></span>
                                         <span class="dot-green"></span>
-                                        <span class="terminal-title">🍎 / 🐧 macOS &amp; Linux (Bash)</span>
+                                        <span class="terminal-title">macOS &amp; Linux (Bash)</span>
                                     </div>
-                                    <button class="btn btn-term-copy" id="btnCopyRemoteMac" onclick="copyTerminalCmd('cmdRemoteMac', 'btnCopyRemoteMac')">📋 1-Click Copy</button>
+                                    <button class="btn btn-term-copy" id="btnCopyRemoteMac" onclick="copyTerminalCmd('cmdRemoteMac', 'btnCopyRemoteMac')">1-Click Copy</button>
                                 </div>
                                 <textarea id="cmdRemoteMac" class="terminal-textarea" spellcheck="false" oninput="autoResizeTerminalTextareas()"></textarea>
                             </div>
@@ -1914,7 +1893,6 @@
 
                         <div class="card" style="grid-column: span 2; border-top: 4px solid var(--success); margin-top: 20px;">
                             <div class="card-header" style="margin-bottom:18px;">
-                                <div class="card-icon green">⚡</div>
                                 <div>
                                     <div class="card-title" style="font-size:16px;">3. Run-Once Continuous 2-Hour Auto-Audit Daemon (Recommended)</div>
                                     <div class="card-subtitle">Run <b>1 time</b> on target machine. Executes compliance audit immediately, then automatically re-audits every 2 hours in the background.</div>
@@ -1928,9 +1906,9 @@
                                             <span class="dot-red"></span>
                                             <span class="dot-yellow"></span>
                                             <span class="dot-green"></span>
-                                            <span class="terminal-title">🪟 Windows (Scheduled Task Daemon)</span>
+                                            <span class="terminal-title">Windows (Scheduled Task Daemon)</span>
                                         </div>
-                                        <button class="btn btn-term-copy" id="btnCopyDaemonWin" onclick="copyTerminalCmd('cmdDaemonWin', 'btnCopyDaemonWin')">📋 1-Click Copy</button>
+                                        <button class="btn btn-term-copy" id="btnCopyDaemonWin" onclick="copyTerminalCmd('cmdDaemonWin', 'btnCopyDaemonWin')">1-Click Copy</button>
                                     </div>
                                     <textarea id="cmdDaemonWin" class="terminal-textarea" spellcheck="false" oninput="autoResizeTerminalTextareas()"></textarea>
                                 </div>
@@ -1941,9 +1919,9 @@
                                             <span class="dot-red"></span>
                                             <span class="dot-yellow"></span>
                                             <span class="dot-green"></span>
-                                            <span class="terminal-title">🍎 / 🐧 macOS &amp; Linux (LaunchAgent / Cron Daemon)</span>
+                                            <span class="terminal-title">macOS &amp; Linux (LaunchAgent / Cron Daemon)</span>
                                         </div>
-                                        <button class="btn btn-term-copy" id="btnCopyDaemonMac" onclick="copyTerminalCmd('cmdDaemonMac', 'btnCopyDaemonMac')">📋 1-Click Copy</button>
+                                        <button class="btn btn-term-copy" id="btnCopyDaemonMac" onclick="copyTerminalCmd('cmdDaemonMac', 'btnCopyDaemonMac')">1-Click Copy</button>
                                     </div>
                                     <textarea id="cmdDaemonMac" class="terminal-textarea" spellcheck="false" oninput="autoResizeTerminalTextareas()"></textarea>
                                 </div>
@@ -1956,7 +1934,6 @@
 
                                 <div class="card" style="border-top: 4px solid var(--primary);">
                                     <div class="card-header" style="margin-bottom:20px;">
-                                        <div class="card-icon blue">⚙️</div>
                                         <div>
                                             <div class="card-title">Server &amp; Network Configuration</div>
                                             <div class="card-subtitle">Manage audit backend host, listening port, and protocol options</div>
@@ -1996,7 +1973,6 @@
 
                                 <div class="card" style="border-top: 4px solid var(--accent);">
                                     <div class="card-header" style="margin-bottom:20px;">
-                                        <div class="card-icon orange">🏛️</div>
                                         <div>
                                             <div class="card-title">Default Branch Information</div>
                                             <div class="card-subtitle">Default values pre-filled when launching compliance audits</div>
@@ -2022,9 +1998,9 @@
                                         <div class="form-group">
                                             <label>Default Target OS</label>
                                             <select id="settingDefaultOs" class="input-field">
-                                                <option value="windows" selected>🪟 Windows (PowerShell / VBS)</option>
-                                                <option value="mac">🍎 macOS (Bash Shell)</option>
-                                                <option value="linux">🐧 Linux (Bash Shell)</option>
+                                                <option value="windows" selected>Windows (PowerShell / VBS)</option>
+                                                <option value="mac">macOS (Bash Shell)</option>
+                                                <option value="linux">Linux (Bash Shell)</option>
                                             </select>
                                         </div>
                                     </div>
@@ -2032,7 +2008,6 @@
 
                                 <div class="card" style="grid-column: span 2; border-top: 4px solid var(--success);">
                                     <div class="card-header" style="margin-bottom:20px;">
-                                        <div class="card-icon green">🛡️</div>
                                         <div>
                                             <div class="card-title">Database &amp; System Maintenance</div>
                                             <div class="card-subtitle">Manage local SQLite database records, log files, and data backups</div>
@@ -2040,9 +2015,9 @@
                                     </div>
 
                                     <div style="display:flex; gap:16px; align-items:center; flex-wrap:wrap;">
-                                        <button class="btn btn-primary" onclick="savePortalSettings()">💾 Save All Settings</button>
-                                        <button class="btn btn-outline" onclick="loadPortalSettings()">🔄 Reload Defaults</button>
-                                        <button class="btn btn-outline" onclick="clearAuditDatabase()" style="margin-left:auto; color:var(--danger); border-color:var(--danger);">🗑️ Clear Cache</button>
+                                        <button class="btn btn-primary" onclick="savePortalSettings()">Save All Settings</button>
+                                        <button class="btn btn-outline" onclick="loadPortalSettings()">Reload Defaults</button>
+                                        <button class="btn btn-outline" onclick="clearAuditDatabase()" style="margin-left:auto; color:var(--danger); border-color:var(--danger);">Clear Cache</button>
                                     </div>
                                     <div id="settingsStatusMsg" style="margin-top:12px; display:none; font-size:13px; font-weight:600; color:var(--success);"></div>
                                 </div>
@@ -3555,7 +3530,7 @@
                                     const data = await r.json();
 
                                     if (!r.ok) {
-                                        container.innerHTML = `<div class="empty-state"><div class="empty-icon" style="color:var(--danger)">⚠️</div><h3>Scan Failed</h3><p>${esc(data.detail || 'Could not scan networks. Windows required.')}</p></div>`;
+                                        container.innerHTML = `<div class="empty-state"><h3>Scan Failed</h3><p>${esc(data.detail || 'Could not scan networks. Windows required.')}</p></div>`;
                                         return;
                                     }
 
@@ -3563,25 +3538,18 @@
                                     document.getElementById('networkListMeta').textContent = `${networks.length} networks found`;
 
                                     if (networks.length === 0) {
-                                        container.innerHTML = `<div class="empty-state"><div class="empty-icon">📡</div><h3>No Networks Found</h3><p>Ensure WiFi adapter is enabled.</p></div>`;
+                                        container.innerHTML = `<div class="empty-state"><h3>No Networks Found</h3><p>Ensure WiFi adapter is enabled.</p></div>`;
                                         return;
                                     }
 
                                     container.innerHTML = `<div style="display:flex; flex-direction:column; gap:8px; max-height:385px; overflow-y:auto; padding-right:6px; padding-bottom:8px; box-sizing:border-box;">
             ${networks.map(n => {
-                                        const signal = parseInt(n.signal) || 0;
-                                        let bars = "📶";
-                                        if (signal < 40) bars = "🔈";
-                                        else if (signal < 70) bars = "🔉";
-                                        else bars = "🔊";
-
                                         return `
                 <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 16px; background:var(--surface-2); border:1px solid var(--border); border-radius:8px; cursor:pointer; transition:all 0.15s;" 
                      onmouseover="this.style.borderColor='var(--primary-lt)'" 
                      onmouseout="this.style.borderColor='var(--border)'"
                      onclick="selectWifi('${esc(n.ssid)}')">
                     <div style="display:flex; align-items:center; gap:12px;">
-                        <span style="font-size:18px;">${bars}</span>
                         <div>
                             <div style="font-weight:600; font-size:14px; color:var(--text);">${esc(n.ssid)}</div>
                             <div style="font-size:11px; color:var(--muted);">${esc(n.authentication || 'Open')} • ${esc(n.signal)} signal</div>
@@ -3592,10 +3560,10 @@
                                     }).join('')}
         </div>`;
                                 } catch (e) {
-                                    container.innerHTML = `<div class="empty-state"><div class="empty-icon" style="color:var(--danger)">❌</div><h3>Error</h3><p>${esc(e.message)}</p></div>`;
+                                    container.innerHTML = `<div class="empty-state"><h3>Error</h3><p>${esc(e.message)}</p></div>`;
                                 } finally {
                                     btn.disabled = false;
-                                    btn.innerHTML = "🔄 Refresh";
+                                    btn.innerHTML = "Refresh";
                                 }
                             }
 
@@ -3687,7 +3655,7 @@
 
                                     if (r.ok && (data.status === 'connected' || data.status === 'connecting')) {
                                         statusEl.className = 'alert alert-success';
-                                        statusEl.textContent = `✅ Connected to ${ssid}. Subnet: ${data.subnet || 'Pending'}. Auto-starting device scan...`;
+                                        statusEl.textContent = `Connected to ${ssid}. Subnet: ${data.subnet || 'Pending'}. Auto-starting device scan...`;
 
                                         await fetchCurrentWifiStatus();
 
@@ -3698,14 +3666,14 @@
 
                                     } else {
                                         statusEl.className = 'alert alert-danger';
-                                        statusEl.textContent = `❌ Failed: ${data.message || data.detail || 'Unknown error'}`;
+                                        statusEl.textContent = `Failed: ${data.message || data.detail || 'Unknown error'}`;
                                     }
                                 } catch (e) {
                                     statusEl.className = 'alert alert-danger';
-                                    statusEl.textContent = `❌ Network Error: ${e.message}`;
+                                    statusEl.textContent = `Network Error: ${e.message}`;
                                 } finally {
                                     btn.disabled = false;
-                                    btn.innerHTML = "🔗 &nbsp;Connect &amp; Scan Network";
+                                    btn.innerHTML = "Connect &amp; Scan Network";
                                 }
                             }
 
@@ -3753,8 +3721,8 @@
                                 tbody.innerHTML = devices.map(d => {
                                     const isAudited = d.audit_status === 'audited';
                                     let badge = isAudited
-                                        ? `<span class="badge badge-green">✅ Audited</span>`
-                                        : `<span class="badge badge-orange">❌ Unaudited</span>`;
+                                        ? `<span class="badge badge-green">Audited</span>`
+                                        : `<span class="badge badge-orange">Unaudited</span>`;
 
                                     if (isAudited && d.last_audit) {
                                         badge += `<div style="font-size:11px; color:var(--muted); margin-top:4px;">${esc(d.last_audit)}</div>`;
@@ -3765,9 +3733,13 @@
                                         : `<span style="color:var(--muted);">${esc(d.username)}</span>`;
 
                                     const hostname = isAudited && d.computer_name && d.computer_name !== 'Unknown' ? d.computer_name : d.hostname;
-                                    const osHtml = isAudited && d.os_name !== 'Unknown'
-                                        ? `<span style="font-weight:500;">${esc(d.os_name)}</span>`
-                                        : `<span style="color:var(--muted);">${esc(d.os_name)}</span>`;
+                                    let osIcon = '';
+                                    let osLower = (d.os_name || '').toLowerCase();
+                                    if (osLower.includes('windows')) osIcon = '🪟';
+                                    else if (osLower.includes('mac')) osIcon = '🍎';
+                                    else if (osLower.includes('ubuntu') || osLower.includes('linux')) osIcon = '🐧';
+
+                                    const osHtml = osIcon ? `<span style="font-weight:500;">${osIcon} &nbsp;${esc(d.os_name)}</span>` : `<span style="font-weight:500;">${esc(d.os_name)}</span>`;
 
                                     const actionBtn = isAudited
                                         ? `<div style="display:flex; gap:6px;">
@@ -3900,15 +3872,15 @@
                                     } else {
                                         statusEl.style.backgroundColor = 'var(--danger-bg)';
                                         statusEl.style.color = 'var(--danger-text)';
-                                        statusEl.innerHTML = `❌ <b>Failed:</b> ${esc(data.detail?.message || data.detail || "Unknown error")}`;
+                                        statusEl.innerHTML = `<b>Failed:</b> ${esc(data.detail?.message || data.detail || "Unknown error")}`;
                                     }
                                 } catch (e) {
                                     statusEl.style.backgroundColor = 'var(--danger-bg)';
                                     statusEl.style.color = 'var(--danger-text)';
-                                    statusEl.innerHTML = `❌ <b>Network Error:</b> ${esc(e.message)}`;
+                                    statusEl.innerHTML = `<b>Network Error:</b> ${esc(e.message)}`;
                                 } finally {
                                     btn.disabled = false;
-                                    btn.innerHTML = "⚡ Send Notification";
+                                    btn.innerHTML = "Send Notification";
                                 }
                             }
 
@@ -3941,16 +3913,16 @@
                                             dateStr = `<div style="font-weight:500;">${parts[0]}</div><div style="font-size:11px; color:var(--muted);">${parts[1]}</div>`;
                                         }
 
-                                        let osIcon = '💻';
+                                        let osIcon = '';
                                         let osLower = (d.os_name || '').toLowerCase();
-                                        if (osLower.includes('windows')) osIcon = '<img src="https://img.icons8.com/color/48/000000/windows-10.png" width="16" style="vertical-align:middle">';
+                                        if (osLower.includes('windows')) osIcon = '🪟';
                                         else if (osLower.includes('mac')) osIcon = '🍎';
                                         else if (osLower.includes('ubuntu') || osLower.includes('linux')) osIcon = '🐧';
 
                                         tr.innerHTML = `
                 <td style="font-weight:600; color:var(--primary);">${esc(d.computer_name)}</td>
                 <td><div style="display:flex; align-items:center; gap:6px;">${osIcon} ${esc(d.os_name)}</div></td>
-                <td><div class="user-badge">👤 ${esc(d.username)}</div></td>
+                <td><div class="user-badge">${esc(d.username)}</div></td>
                 <td>${dateStr}</td>
                 <td>
                     <button class="btn btn-outline btn-sm" onclick="switchTab('software'); setTimeout(() => { document.getElementById('deviceSelector').value = '${esc(d.id || d.computer_name)}'; loadSoftwareForDevice(); }, 100);">

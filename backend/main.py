@@ -1185,22 +1185,48 @@ def list_audited_devices():
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         cursor = conn.execute('''
-            SELECT mac_address, computer_name, os_name, MAX(execution_datetime) as last_seen
+            SELECT mac_address, computer_name, os_name, execution_datetime, audit_data
             FROM device_audits
-            GROUP BY mac_address, computer_name
+            ORDER BY execution_datetime DESC
         ''')
         for row in cursor:
-            mac = row['mac_address']
-            name = row['computer_name']
-            uid = mac if mac != "Unknown" else name
-            if uid not in devices or row['last_seen'] > devices[uid]['last_seen']:
-                devices[uid] = {
+            name = (row['computer_name'] or "Unknown").strip()
+            os_name = (row['os_name'] or "Unknown").strip()
+            
+            # Categorize OS family to pair same OS versions (e.g. Windows 10 vs 11 or macOS vs macOS)
+            os_lower = os_name.lower()
+            if "windows" in os_lower:
+                os_family = "windows"
+            elif "mac" in os_lower:
+                os_family = "mac"
+            elif "ubuntu" in os_lower or "linux" in os_lower:
+                os_family = "linux"
+            else:
+                os_family = os_lower
+
+            key = (name.lower(), os_family)
+            if key not in devices:
+                user = "Unknown"
+                if row['audit_data']:
+                    try:
+                        ad = json.loads(row['audit_data'])
+                        user = ad.get("current_user") or ad.get("user") or "Unknown"
+                    except Exception:
+                        pass
+
+                mac = row['mac_address']
+                uid = mac if mac and mac != "Unknown" else name
+                devices[key] = {
                     "id": uid,
                     "computer_name": name,
-                    "last_seen": row['last_seen'],
-                    "os_name": row['os_name']
+                    "os_name": os_name,
+                    "username": user,
+                    "last_seen": row['execution_datetime']
                 }
-    return {"devices": list(devices.values()), "total": len(devices)}
+
+    device_list = list(devices.values())
+    device_list.sort(key=lambda x: x.get("last_seen", ""), reverse=True)
+    return {"devices": device_list, "total": len(device_list)}
 
 
 
