@@ -1439,10 +1439,11 @@
                 </div>
                 
                 <!-- TABS ROW -->
-                <div style="display:flex; gap:12px; border-top:1px solid var(--border); padding-top:16px;">
+                <div style="display:flex; gap:12px; border-top:1px solid var(--border); padding-top:16px; flex-wrap:wrap;">
                     <button class="btn btn-outline dev-tab-btn" id="dev-btn-hardware" onclick="switchDeviceTab('hardware')" style="background:var(--surface-3); border-color:var(--primary); color:var(--primary);">🖥 Hardware</button>
-                    <button class="btn btn-outline dev-tab-btn" id="dev-btn-software" onclick="switchDeviceTab('software')" style="border-color:transparent; color:var(--text-2);">💻 Software</button>
-                    <button class="btn btn-outline dev-tab-btn" id="dev-btn-assets" onclick="switchDeviceTab('assets')" style="border-color:transparent; color:var(--text-2);">📦 Asset Management</button>
+                    <button class="btn btn-outline dev-tab-btn" id="dev-btn-software" onclick="switchDeviceTab('software')" style="border-color:transparent; color:var(--text-2);">💻 Software &amp; Users</button>
+                    <button class="btn btn-outline dev-tab-btn" id="dev-btn-assets" onclick="switchDeviceTab('assets')" style="border-color:transparent; color:var(--text-2);">📋 Lifecycle &amp; Procurement</button>
+                    <button class="btn btn-outline dev-tab-btn" id="dev-btn-tickets" onclick="switchDeviceTab('tickets')" style="border-color:transparent; color:var(--text-2);">🎟️ Tickets &amp; ITSM</button>
                 </div>
             </div>
 
@@ -1721,44 +1722,139 @@
 
             </div>
 
-            <!-- ASSET MANAGEMENT TAB -->
+            <!-- LIFECYCLE & PROCUREMENT TAB -->
             <div id="dev-tab-assets" style="display:none;">
-                <div class="card" style="margin-bottom:24px;">
-                    <div class="card-title" style="margin-bottom:16px; font-size:16px; display:flex; align-items:center; gap:8px;">📦 Asset Details</div>
+                <div class="card" style="margin-bottom:24px; border-top:4px solid var(--primary);">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                        <div class="card-title" style="font-size:16px; display:flex; align-items:center; gap:8px;">📋 Lifecycle, Procurement &amp; Warranty Metadata</div>
+                        <button class="btn btn-outline btn-sm" onclick="toggleLifecycleEditModal()">✏️ Edit Lifecycle Details</button>
+                    </div>
+
                     <div style="display:grid; grid-template-columns: max-content max-content 1fr; gap: 12px 16px; background: #f8fafc; padding: 20px; border-radius: 8px; font-size:14px;">
-                        
-                        <span style="color:var(--muted); font-weight:600;">Owner</span>
+                        <span style="color:var(--muted); font-weight:600;">Asset Owner / Assignee</span>
                         <span>=</span>
-                        <span style="color:var(--text-1);">—</span>
-                        
-                        <span style="color:var(--muted); font-weight:600;">Status</span>
+                        <span id="lifeOwnerVal" style="color:var(--text-1); font-weight:600;">—</span>
+
+                        <span style="color:var(--muted); font-weight:600;">Lifecycle Status</span>
                         <span>=</span>
-                        <span style="color:var(--text-1);">—</span>
-                        
-                        <span style="color:var(--muted); font-weight:600;">Vendor</span>
+                        <span id="lifeStatusVal" style="color:var(--text-1);">Active</span>
+
+                        <span style="color:var(--muted); font-weight:600;">Hardware Vendor</span>
                         <span>=</span>
-                        <span style="color:var(--text-1);">—</span>
-                        
-                        <span style="color:var(--muted); font-weight:600;">Purchase Information</span>
+                        <span id="lifeVendorVal" style="color:var(--text-1);">—</span>
+
+                        <span style="color:var(--muted); font-weight:600;">Supplier / Reseller</span>
                         <span>=</span>
-                        <span style="color:var(--text-1);">—</span>
-                        
-                        <span style="color:var(--muted); font-weight:600;">Warranty</span>
+                        <span id="lifeSupplierVal" style="color:var(--text-1);">—</span>
+
+                        <span style="color:var(--muted); font-weight:600;">Purchase Price</span>
                         <span>=</span>
-                        <span style="color:var(--text-1);">—</span>
-                        
-                        <span style="color:var(--muted); font-weight:600;">Purchase Order</span>
+                        <span id="lifePriceVal" style="color:var(--text-1);">—</span>
+
+                        <span style="color:var(--muted); font-weight:600;">Purchase Date</span>
                         <span>=</span>
-                        <span style="color:var(--text-1);">—</span>
-                        
-                        <span style="color:var(--muted); font-weight:600;">Tickets</span>
+                        <span id="lifePurchaseDateVal" style="color:var(--text-1);">—</span>
+
+                        <span style="color:var(--muted); font-weight:600;">PO (Purchase Order) Number</span>
                         <span>=</span>
-                        <span style="color:var(--text-1);">—</span>
-                        
-                        <span style="color:var(--muted); font-weight:600;">Licensing</span>
+                        <span id="lifePoVal" style="color:var(--text-1);">—</span>
+
+                        <span style="color:var(--muted); font-weight:600;">Warranty Start &amp; Expiry</span>
                         <span>=</span>
-                        <span style="color:var(--text-1);">—</span>
-                        
+                        <span id="lifeWarrantyDatesVal" style="color:var(--text-1);">—</span>
+
+                        <span style="color:var(--muted); font-weight:600;">Warranty Provider</span>
+                        <span>=</span>
+                        <span id="lifeWarrantyProviderVal" style="color:var(--text-1);">—</span>
+
+                        <span style="color:var(--muted); font-weight:600;">Warranty Notes / SLA</span>
+                        <span>=</span>
+                        <span id="lifeWarrantyNotesVal" style="color:var(--text-1);">—</span>
+                    </div>
+
+                    <!-- Inline Lifecycle Edit Form -->
+                    <div id="lifecycleEditForm" style="display:none; margin-top:20px; padding-top:20px; border-top:1px solid var(--border);">
+                        <h4 style="margin-bottom:14px; color:var(--primary);">✏️ Update Lifecycle &amp; Procurement Record</h4>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                            <div><label style="font-size:12px; font-weight:600;">Owner</label><input type="text" id="editLifeOwner" class="input-field"></div>
+                            <div><label style="font-size:12px; font-weight:600;">Status</label>
+                                <select id="editLifeStatus" class="input-field">
+                                    <option value="Active">Active</option>
+                                    <option value="Maintenance">Maintenance</option>
+                                    <option value="EOL">End of Life</option>
+                                    <option value="Retired">Retired</option>
+                                </select>
+                            </div>
+                            <div><label style="font-size:12px; font-weight:600;">Vendor</label><input type="text" id="editLifeVendor" class="input-field"></div>
+                            <div><label style="font-size:12px; font-weight:600;">Supplier</label><input type="text" id="editLifeSupplier" class="input-field"></div>
+                            <div><label style="font-size:12px; font-weight:600;">Purchase Price (₹)</label><input type="text" id="editLifePrice" class="input-field"></div>
+                            <div><label style="font-size:12px; font-weight:600;">Purchase Date</label><input type="date" id="editLifePurchaseDate" class="input-field"></div>
+                            <div><label style="font-size:12px; font-weight:600;">PO Number</label><input type="text" id="editLifePo" class="input-field"></div>
+                            <div><label style="font-size:12px; font-weight:600;">Warranty Provider</label><input type="text" id="editLifeWarrantyProvider" class="input-field"></div>
+                            <div><label style="font-size:12px; font-weight:600;">Warranty Start</label><input type="date" id="editLifeWarrantyStart" class="input-field"></div>
+                            <div><label style="font-size:12px; font-weight:600;">Warranty End</label><input type="date" id="editLifeWarrantyEnd" class="input-field"></div>
+                            <div style="grid-column:span 2;"><label style="font-size:12px; font-weight:600;">Warranty Notes</label><input type="text" id="editLifeWarrantyNotes" class="input-field"></div>
+                        </div>
+                        <div style="display:flex; gap:10px; margin-top:14px;">
+                            <button class="btn btn-primary btn-sm" onclick="saveLifecycleDetails()">💾 Save Record</button>
+                            <button class="btn btn-outline btn-sm" onclick="toggleLifecycleEditModal()">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TICKETS & ITSM TAB -->
+            <div id="dev-tab-tickets" style="display:none;">
+                <div class="card" style="margin-bottom:24px; border-top:4px solid var(--info);">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                        <div>
+                            <div class="card-title" style="font-size:16px; display:flex; align-items:center; gap:8px;">🎟️ Helpdesk &amp; ITSM Tickets</div>
+                            <div class="card-subtitle">Track support requests, maintenance tickets, and Mean Time Between Failures (MTBF)</div>
+                        </div>
+                        <button class="btn btn-primary btn-sm" onclick="toggleNewTicketForm()">➕ Create Support Ticket</button>
+                    </div>
+
+                    <!-- Create Ticket Form -->
+                    <div id="newTicketForm" style="display:none; margin-bottom:20px; background:#f8fafc; padding:16px; border-radius:8px; border:1px solid var(--border);">
+                        <h4 style="margin-bottom:12px; font-size:14px;">New Incident Ticket</h4>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
+                            <div><label style="font-size:12px; font-weight:600;">Ticket #</label><input type="text" id="ticketNumInput" class="input-field" placeholder="e.g. INC-2026-9901"></div>
+                            <div><label style="font-size:12px; font-weight:600;">Priority</label>
+                                <select id="ticketPriorityInput" class="input-field">
+                                    <option value="Low">Low</option>
+                                    <option value="Medium" selected>Medium</option>
+                                    <option value="High">High</option>
+                                    <option value="Critical">Critical</option>
+                                </select>
+                            </div>
+                            <div><label style="font-size:12px; font-weight:600;">Assigned Officer</label><input type="text" id="ticketAssignedInput" class="input-field" placeholder="IT Support Engineer"></div>
+                            <div><label style="font-size:12px; font-weight:600;">Estimated MTBF (Hours)</label><input type="text" id="ticketMtbfInput" class="input-field" placeholder="e.g. 720 hrs"></div>
+                            <div style="grid-column:span 2;"><label style="font-size:12px; font-weight:600;">Issue Summary</label><input type="text" id="ticketSummaryInput" class="input-field" placeholder="Brief description of the problem..."></div>
+                        </div>
+                        <div style="display:flex; gap:10px;">
+                            <button class="btn btn-primary btn-sm" onclick="submitNewTicket()">Submit Ticket</button>
+                            <button class="btn btn-outline btn-sm" onclick="toggleNewTicketForm()">Cancel</button>
+                        </div>
+                    </div>
+
+                    <!-- Tickets Table -->
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Ticket #</th>
+                                    <th>Summary</th>
+                                    <th>Priority</th>
+                                    <th>Status</th>
+                                    <th>Assigned</th>
+                                    <th>MTBF</th>
+                                    <th>Date</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ticketsTableBody">
+                                <tr><td colspan="7" style="text-align:center; padding:20px; color:var(--muted);">No tickets recorded for this device.</td></tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -2774,6 +2870,158 @@ function exportScanResults() {
 }
 
 // ────────────────────────────────────────────────────────────────────
+//  SUB-TAB SWITCHING (Hardware, Software, Lifecycle, Tickets)
+// ────────────────────────────────────────────────────────────────────
+let currentDeviceMac = '';
+let currentDeviceName = '';
+
+function switchDeviceTab(tabName) {
+    ['hardware', 'software', 'assets', 'tickets'].forEach(t => {
+        const btn = document.getElementById(`dev-btn-${t}`);
+        const panel = document.getElementById(`dev-tab-${t}`);
+        if (btn) {
+            if (t === tabName) {
+                btn.style.background = 'var(--surface-3)';
+                btn.style.borderColor = 'var(--primary)';
+                btn.style.color = 'var(--primary)';
+            } else {
+                btn.style.background = 'transparent';
+                btn.style.borderColor = 'transparent';
+                btn.style.color = 'var(--text-2)';
+            }
+        }
+        if (panel) panel.style.display = (t === tabName) ? 'block' : 'none';
+    });
+}
+
+async function fetchLifecycleData(mac, name) {
+    currentDeviceMac = mac || name;
+    currentDeviceName = name;
+    try {
+        const r = await fetch(`/api/lifecycle/${encodeURIComponent(currentDeviceMac)}`);
+        const d = await r.json();
+        setTxt('lifeOwnerVal', d.owner || '—');
+        setTxt('lifeStatusVal', d.status || 'Active');
+        setTxt('lifeVendorVal', d.vendor || '—');
+        setTxt('lifeSupplierVal', d.supplier || '—');
+        setTxt('lifePriceVal', d.purchase_price ? `₹${d.purchase_price}` : '—');
+        setTxt('lifePurchaseDateVal', d.purchase_date || '—');
+        setTxt('lifePoVal', d.po_number || '—');
+        setTxt('lifeWarrantyDatesVal', (d.warranty_start && d.warranty_end) ? `${d.warranty_start} to ${d.warranty_end}` : (d.warranty_end || '—'));
+        setTxt('lifeWarrantyProviderVal', d.warranty_provider || '—');
+        setTxt('lifeWarrantyNotesVal', d.warranty_notes || '—');
+
+        // Pre-fill edit fields
+        if (document.getElementById('editLifeOwner')) document.getElementById('editLifeOwner').value = d.owner || '';
+        if (document.getElementById('editLifeStatus')) document.getElementById('editLifeStatus').value = d.status || 'Active';
+        if (document.getElementById('editLifeVendor')) document.getElementById('editLifeVendor').value = d.vendor || '';
+        if (document.getElementById('editLifeSupplier')) document.getElementById('editLifeSupplier').value = d.supplier || '';
+        if (document.getElementById('editLifePrice')) document.getElementById('editLifePrice').value = d.purchase_price || '';
+        if (document.getElementById('editLifePurchaseDate')) document.getElementById('editLifePurchaseDate').value = d.purchase_date || '';
+        if (document.getElementById('editLifePo')) document.getElementById('editLifePo').value = d.po_number || '';
+        if (document.getElementById('editLifeWarrantyProvider')) document.getElementById('editLifeWarrantyProvider').value = d.warranty_provider || '';
+        if (document.getElementById('editLifeWarrantyStart')) document.getElementById('editLifeWarrantyStart').value = d.warranty_start || '';
+        if (document.getElementById('editLifeWarrantyEnd')) document.getElementById('editLifeWarrantyEnd').value = d.warranty_end || '';
+        if (document.getElementById('editLifeWarrantyNotes')) document.getElementById('editLifeWarrantyNotes').value = d.warranty_notes || '';
+    } catch(e) {
+        console.error('Lifecycle fetch failed:', e);
+    }
+}
+
+function toggleLifecycleEditModal() {
+    const f = document.getElementById('lifecycleEditForm');
+    if (f) f.style.display = (f.style.display === 'none') ? 'block' : 'none';
+}
+
+async function saveLifecycleDetails() {
+    const body = {
+        mac_address: currentDeviceMac,
+        computer_name: currentDeviceName,
+        owner: document.getElementById('editLifeOwner').value.trim(),
+        status: document.getElementById('editLifeStatus').value,
+        vendor: document.getElementById('editLifeVendor').value.trim(),
+        supplier: document.getElementById('editLifeSupplier').value.trim(),
+        purchase_price: document.getElementById('editLifePrice').value.trim(),
+        purchase_date: document.getElementById('editLifePurchaseDate').value,
+        po_number: document.getElementById('editLifePo').value.trim(),
+        warranty_provider: document.getElementById('editLifeWarrantyProvider').value.trim(),
+        warranty_start: document.getElementById('editLifeWarrantyStart').value,
+        warranty_end: document.getElementById('editLifeWarrantyEnd').value,
+        warranty_notes: document.getElementById('editLifeWarrantyNotes').value.trim()
+    };
+    try {
+        await fetch('/api/lifecycle', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify(body)
+        });
+        showAlert('Record Saved', 'Lifecycle metadata updated successfully!', 'success');
+        toggleLifecycleEditModal();
+        fetchLifecycleData(currentDeviceMac, currentDeviceName);
+    } catch(e) {
+        showAlert('Save Failed', e.message, 'error');
+    }
+}
+
+async function fetchTicketsData(mac, name) {
+    try {
+        const r = await fetch(`/api/tickets/${encodeURIComponent(mac || name)}`);
+        const list = await r.json();
+        const tbody = document.getElementById('ticketsTableBody');
+        if (!tbody) return;
+        if (!list || !list.length) {
+            tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:20px; color:var(--muted);">No tickets recorded for this device.</td></tr>`;
+            return;
+        }
+        tbody.innerHTML = list.map(t => {
+            const pBadge = t.priority === 'Critical' ? 'badge-red' : (t.priority === 'High' ? 'badge-orange' : 'badge-gray');
+            const sBadge = t.status === 'Open' ? 'badge-blue' : 'badge-green';
+            return `<tr>
+                <td><b class="td-mono">${esc(t.ticket_number)}</b></td>
+                <td>${esc(t.summary)}</td>
+                <td><span class="badge ${pBadge}">${esc(t.priority)}</span></td>
+                <td><span class="badge ${sBadge}">${esc(t.status)}</span></td>
+                <td>${esc(t.assigned || 'Unassigned')}</td>
+                <td>${esc(t.mtbf || 'N/A')}</td>
+                <td style="color:var(--text-2); font-size:12px;">${esc((t.created_at || '').split('T')[0])}</td>
+            </tr>`;
+        }).join('');
+    } catch(e) {
+        console.error('Tickets fetch failed:', e);
+    }
+}
+
+function toggleNewTicketForm() {
+    const f = document.getElementById('newTicketForm');
+    if (f) f.style.display = (f.style.display === 'none') ? 'block' : 'none';
+}
+
+async function submitNewTicket() {
+    const body = {
+        mac_address: currentDeviceMac,
+        computer_name: currentDeviceName,
+        ticket_number: document.getElementById('ticketNumInput').value.trim() || `INC-${Date.now().toString().slice(-4)}`,
+        priority: document.getElementById('ticketPriorityInput').value,
+        assigned: document.getElementById('ticketAssignedInput').value.trim(),
+        mtbf: document.getElementById('ticketMtbfInput').value.trim(),
+        summary: document.getElementById('ticketSummaryInput').value.trim()
+    };
+    if (!body.summary) { showAlert('Summary Required', 'Please enter a brief ticket summary.', 'warning'); return; }
+    try {
+        await fetch('/api/tickets', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify(body)
+        });
+        showAlert('Ticket Created', `Incident ${body.ticket_number} logged successfully!`, 'success');
+        toggleNewTicketForm();
+        fetchTicketsData(currentDeviceMac, currentDeviceName);
+    } catch(e) {
+        showAlert('Ticket Creation Failed', e.message, 'error');
+    }
+}
+
+// ────────────────────────────────────────────────────────────────────
 //  TAB 4 — SOFTWARE INVENTORY
 // ────────────────────────────────────────────────────────────────────
 let swData = [];
@@ -3141,7 +3389,11 @@ async function loadSoftwareForDevice() {
         if (userList.length > 0) {
             let uHtml = `<ul style="margin:0; padding-left:18px; line-height:1.6;">` + userList.map(u => {
                 const statusBadge = (u.disabled === 'True') ? `<span class="badge badge-gray" style="font-size:10px; padding:1px 5px; margin-left:6px;">Disabled</span>` : `<span class="badge badge-green" style="font-size:10px; padding:1px 5px; margin-left:6px;">Active</span>`;
-                return `<li><b>${esc(u.name || 'User')}</b> ${statusBadge}</li>`;
+                const curSession = (u.current_user === 'True') ? ` <span class="badge badge-blue" style="font-size:10px; padding:1px 5px; margin-left:4px;">Active Session</span>` : '';
+                const uType = u.user_type ? ` [${esc(u.user_type)}]` : '';
+                const homeDir = u.home_directory ? `<br>&emsp;📁 <span style="font-size:12px; color:var(--text-2);">Home: <code>${esc(u.home_directory)}</code></span>` : '';
+                const lastLog = (u.last_login && u.last_login !== 'Unknown') ? ` | <span style="font-size:12px; color:var(--text-2);">🕒 Last Login: ${esc(u.last_login)}</span>` : '';
+                return `<li><b>${esc(u.name || 'User')}</b>${uType}${statusBadge}${curSession}${homeDir}${lastLog}</li>`;
             }).join('') + `</ul>`;
             setHtml('specUsers', uHtml);
         } else {
@@ -3149,6 +3401,11 @@ async function loadSoftwareForDevice() {
         }
 
         setTxt('specAuditInfo', `Execution DateTime: ${data.last_audit || 'Just now'} | Consent: Verified`);
+
+        // Fetch Lifecycle & Ticket Details
+        const devMac = data.mac_address || hw.mac_address || name;
+        fetchLifecycleData(devMac, name);
+        fetchTicketsData(devMac, name);
 
         // Populate Login History
         loginData = data.login_history || [];

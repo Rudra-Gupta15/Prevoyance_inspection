@@ -67,6 +67,39 @@ def init_db():
                 updated_at TEXT
             )
         ''')
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS asset_lifecycle (
+                mac_address TEXT PRIMARY KEY,
+                computer_name TEXT,
+                owner TEXT DEFAULT '',
+                vendor TEXT DEFAULT '',
+                status TEXT DEFAULT 'Active',
+                warranty_start TEXT DEFAULT '',
+                warranty_end TEXT DEFAULT '',
+                warranty_notes TEXT DEFAULT '',
+                warranty_provider TEXT DEFAULT '',
+                purchase_price TEXT DEFAULT '',
+                purchase_date TEXT DEFAULT '',
+                supplier TEXT DEFAULT '',
+                po_number TEXT DEFAULT '',
+                updated_at TEXT
+            )
+        ''')
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS asset_tickets (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                mac_address TEXT,
+                computer_name TEXT,
+                ticket_number TEXT,
+                summary TEXT,
+                status TEXT DEFAULT 'Open',
+                assigned TEXT DEFAULT '',
+                priority TEXT DEFAULT 'Medium',
+                mtbf TEXT DEFAULT '',
+                created_at TEXT,
+                updated_at TEXT
+            )
+        ''')
         conn.commit()
 
 init_db()
@@ -176,6 +209,7 @@ class DiskPartition(BaseModel):
     bootable: str = "Unknown"
     health: str = "Healthy"
     ssd_hdd: str = "SSD/HDD"
+    file_system_type: str = "Unknown"
 
     @validator("*", pre=True, allow_reuse=True)
     def normalize(cls, v):
@@ -252,6 +286,12 @@ class NetworkDetails(BaseModel):
 class UserAccount(BaseModel):
     name: str = "Unknown"
     disabled: str = "Unknown"
+    home_directory: str = "Unknown"
+    last_login: str = "Unknown"
+    licensed: str = "Yes"
+    number_of_logins: str = "1"
+    user_type: str = "Local"
+    current_user: str = "False"
 
     @validator("*", pre=True, allow_reuse=True)
     def normalize(cls, v):
@@ -2096,6 +2136,110 @@ def check_trigger(device_name: str = Query(...)):
         pending_scan_triggers.clear()
         logger.info(f"Trigger delivered to checking daemon: {device_name}")
     return {"trigger": triggered}
+
+
+# ==============================================================================
+# 11. ASSET LIFECYCLE & TICKET MANAGEMENT APIs
+# ==============================================================================
+
+class LifecycleData(BaseModel):
+    mac_address: str
+    computer_name: str = ""
+    owner: str = ""
+    vendor: str = ""
+    status: str = "Active"
+    warranty_start: str = ""
+    warranty_end: str = ""
+    warranty_notes: str = ""
+    warranty_provider: str = ""
+    purchase_price: str = ""
+    purchase_date: str = ""
+    supplier: str = ""
+    po_number: str = ""
+
+
+@app.get("/api/lifecycle/{mac_address}")
+def get_lifecycle(mac_address: str):
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM asset_lifecycle WHERE mac_address=?", (mac_address,)).fetchone()
+    if row:
+        return dict(row)
+    return {}
+
+
+@app.post("/api/lifecycle")
+def save_lifecycle(data: LifecycleData):
+    now = datetime.now().isoformat()
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute('''
+            INSERT INTO asset_lifecycle
+                (mac_address, computer_name, owner, vendor, status, warranty_start, warranty_end,
+                 warranty_notes, warranty_provider, purchase_price, purchase_date, supplier, po_number, updated_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            ON CONFLICT(mac_address) DO UPDATE SET
+                computer_name=excluded.computer_name, owner=excluded.owner, vendor=excluded.vendor,
+                status=excluded.status, warranty_start=excluded.warranty_start, warranty_end=excluded.warranty_end,
+                warranty_notes=excluded.warranty_notes, warranty_provider=excluded.warranty_provider,
+                purchase_price=excluded.purchase_price, purchase_date=excluded.purchase_date,
+                supplier=excluded.supplier, po_number=excluded.po_number, updated_at=excluded.updated_at
+        ''', (data.mac_address, data.computer_name, data.owner, data.vendor, data.status,
+              data.warranty_start, data.warranty_end, data.warranty_notes, data.warranty_provider,
+              data.purchase_price, data.purchase_date, data.supplier, data.po_number, now))
+        conn.commit()
+    return {"status": "saved"}
+
+
+class TicketData(BaseModel):
+    mac_address: str
+    computer_name: str = ""
+    ticket_number: str = ""
+    summary: str = ""
+    status: str = "Open"
+    assigned: str = ""
+    priority: str = "Medium"
+    mtbf: str = ""
+
+
+@app.get("/api/tickets/{mac_address}")
+def get_tickets(mac_address: str):
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute("SELECT * FROM asset_tickets WHERE mac_address=? ORDER BY created_at DESC", (mac_address,)).fetchall()
+    return [dict(r) for r in rows]
+
+
+@app.post("/api/tickets")
+def create_ticket(data: TicketData):
+    now = datetime.now().isoformat()
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute('''
+            INSERT INTO asset_tickets (mac_address, computer_name, ticket_number, summary, status, assigned, priority, mtbf, created_at, updated_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?)
+        ''', (data.mac_address, data.computer_name, data.ticket_number, data.summary,
+              data.status, data.assigned, data.priority, data.mtbf, now, now))
+        conn.commit()
+    return {"status": "created"}
+
+
+@app.put("/api/tickets/{ticket_id}")
+def update_ticket(ticket_id: int, data: TicketData):
+    now = datetime.now().isoformat()
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute('''
+            UPDATE asset_tickets SET summary=?, status=?, assigned=?, priority=?, mtbf=?, updated_at=?
+            WHERE id=?
+        ''', (data.summary, data.status, data.assigned, data.priority, data.mtbf, now, ticket_id))
+        conn.commit()
+    return {"status": "updated"}
+
+
+@app.delete("/api/tickets/{ticket_id}")
+def delete_ticket(ticket_id: int):
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("DELETE FROM asset_tickets WHERE id=?", (ticket_id,))
+        conn.commit()
+    return {"status": "deleted"}
 
 # ==============================================================================
 # 10. SERVE FRONTEND (UI)

@@ -132,7 +132,48 @@ fi
 [ -z "$IP_ADDRESS" ] && IP_ADDRESS="Unknown"
 
 NETWORK_DETAILS="[{\"ip_address\": \"$IP_ADDRESS\", \"gateway\": \"Unknown\", \"mac\": \"$MAC_ADDRESS\"}]"
-USER_ACCOUNTS="[{\"name\": \"$USER\", \"disabled\": \"False\"}]"
+
+# ── Rich User Account Collection ────────────────────────────────────────────
+USER_ACCOUNTS="[]"
+CURRENT_USER_NAME="$USER"
+
+if [ "$OS_NAME" = "macOS" ]; then
+    USER_ACCOUNTS=$(dscl . list /Users | grep -v '^_' | while read -r uname; do
+        uid=$(dscl . -read "/Users/$uname" UniqueID 2>/dev/null | awk '{print $2}')
+        [ -z "$uid" ] && continue
+        [ "$uid" -lt 500 ] 2>/dev/null && continue
+        home=$(dscl . -read "/Users/$uname" NFSHomeDirectory 2>/dev/null | awk '{print $2}')
+        [ -z "$home" ] && home="Unknown"
+        real_name=$(dscl . -read "/Users/$uname" RealName 2>/dev/null | tail -1 | sed 's/^ *//')
+        [ -z "$real_name" ] && real_name="$uname"
+        last_login=$(last -1 "$uname" 2>/dev/null | head -1 | awk '{print $4" "$5" "$6" "$7}' | sed 's/^ *//; s/ *$//')
+        [ -z "$last_login" ] || [ "$last_login" = "   " ] && last_login="Never"
+        is_admin=$(dscl . -read /Groups/admin GroupMembership 2>/dev/null | grep -w "$uname" | wc -l | tr -d ' ')
+        user_type="Local User"
+        [ "$is_admin" -gt 0 ] 2>/dev/null && user_type="Local Administrator"
+        is_current="False"
+        [ "$uname" = "$CURRENT_USER_NAME" ] && is_current="True"
+        num_logins=$(last "$uname" 2>/dev/null | grep -vc "^$" || echo "1")
+        printf '{"name":"%s","disabled":"False","home_directory":"%s","last_login":"%s","licensed":"Yes","number_of_logins":"%s","user_type":"%s","current_user":"%s"}|' \
+            "$uname" "$home" "$last_login" "$num_logins" "$user_type" "$is_current"
+    done | sed 's/|$//' | awk '{printf "[%s]", $0}' | sed 's/}{/},{/g')
+else
+    USER_ACCOUNTS=$(getent passwd 2>/dev/null | awk -F: '$3 >= 1000 && $3 < 65534' | while IFS=: read -r uname _ uid _ _ home _; do
+        [ -z "$uname" ] && continue
+        last_login=$(last -1 "$uname" 2>/dev/null | head -1 | awk '{print $4" "$5" "$6" "$7}' | sed 's/^ *//; s/ *$//')
+        [ -z "$last_login" ] && last_login="Never"
+        is_sudo=$(groups "$uname" 2>/dev/null | grep -cwE 'sudo|wheel' || echo 0)
+        user_type="Local User"
+        [ "$is_sudo" -gt 0 ] 2>/dev/null && user_type="Local Administrator"
+        is_current="False"
+        [ "$uname" = "$CURRENT_USER_NAME" ] && is_current="True"
+        [ -z "$home" ] && home="/home/$uname"
+        printf '{"name":"%s","disabled":"False","home_directory":"%s","last_login":"%s","licensed":"Yes","number_of_logins":"1","user_type":"%s","current_user":"%s"}|' \
+            "$uname" "$home" "$last_login" "$user_type" "$is_current"
+    done | sed 's/|$//' | awk '{printf "[%s]", $0}' | sed 's/}{/},{/g')
+fi
+[ -z "$USER_ACCOUNTS" ] || [ "$USER_ACCOUNTS" = "[]" ] && \
+    USER_ACCOUNTS="[{\"name\":\"$USER\",\"disabled\":\"False\",\"home_directory\":\"$HOME\",\"last_login\":\"Unknown\",\"licensed\":\"Yes\",\"number_of_logins\":\"1\",\"user_type\":\"Local User\",\"current_user\":\"True\"}]"
 
 # ────────────────────────────────────────────────────────────────────────────
 #  PHASE 1 — EXTENDED HARDWARE COLLECTION
@@ -730,18 +771,53 @@ try:
                         pass
                 apps.append({'name': name, 'version': version, 'publisher': pub, 'install_date': install_date, 'size_mb': 'Unknown'})
     else:
-        # Linux: dpkg-query
+        # Linux Software Scanner (dpkg, rpm, pacman, snap, flatpak)
         try:
+            # 1. dpkg (Debian / Ubuntu / Mint)
             out = subprocess.check_output(
                 ['dpkg-query', '-W', '--showformat=${Package}|${Version}|${Installed-Size}\n'],
                 stderr=open(os.devnull, 'w')
             )
-            for line in out.decode('utf-8', errors='replace').strip().split('\n')[:150]:
+            for line in out.decode('utf-8', errors='replace').strip().split('\n')[:300]:
                 parts = line.split('|')
                 if len(parts) >= 2 and parts[0].strip():
                     size_kb = int(parts[2].strip()) if len(parts) > 2 and parts[2].strip().isdigit() else 0
                     size_str = str(round(size_kb / 1024.0, 2)) + ' MB' if size_kb > 0 else 'Unknown'
-                    apps.append({'name': parts[0].strip(), 'version': parts[1].strip(), 'publisher': '', 'install_date': 'Unknown', 'size_mb': size_str})
+                    apps.append({'name': parts[0].strip(), 'version': parts[1].strip(), 'publisher': 'Debian/Ubuntu', 'install_date': 'Unknown', 'size_mb': size_str})
+        except Exception:
+            pass
+
+        if not apps:
+            try:
+                # 2. rpm (RedHat / Fedora / CentOS / Alma / Rocky)
+                out = subprocess.check_output(['rpm', '-qa', '--qf', '%{NAME}|%{VERSION}-%{RELEASE}|%{SIZE}\n'], stderr=open(os.devnull, 'w'))
+                for line in out.decode('utf-8', errors='replace').strip().split('\n')[:300]:
+                    parts = line.split('|')
+                    if len(parts) >= 2 and parts[0].strip():
+                        size_b = int(parts[2].strip()) if len(parts) > 2 and parts[2].strip().isdigit() else 0
+                        size_str = str(round(size_b / 1048576.0, 2)) + ' MB' if size_b > 0 else 'Unknown'
+                        apps.append({'name': parts[0].strip(), 'version': parts[1].strip(), 'publisher': 'RedHat/RPM', 'install_date': 'Unknown', 'size_mb': size_str})
+            except Exception:
+                pass
+
+        if not apps:
+            try:
+                # 3. pacman (Arch Linux / Manjaro)
+                out = subprocess.check_output(['pacman', '-Q'], stderr=open(os.devnull, 'w'))
+                for line in out.decode('utf-8', errors='replace').strip().split('\n')[:300]:
+                    parts = line.split()
+                    if len(parts) >= 2:
+                        apps.append({'name': parts[0].strip(), 'version': parts[1].strip(), 'publisher': 'Arch Linux', 'install_date': 'Unknown', 'size_mb': 'Unknown'})
+            except Exception:
+                pass
+
+        # 4. Snap / Flatpak
+        try:
+            out = subprocess.check_output(['snap', 'list'], stderr=open(os.devnull, 'w'))
+            for line in out.decode('utf-8', errors='replace').strip().split('\n')[1:]:
+                parts = line.split()
+                if len(parts) >= 2:
+                    apps.append({'name': parts[0].strip(), 'version': parts[1].strip(), 'publisher': 'Snap Package', 'install_date': 'Unknown', 'size_mb': 'Unknown'})
         except Exception:
             pass
 except Exception:
@@ -749,6 +825,16 @@ except Exception:
 print(json.dumps(apps))
 PYEOF
     )
+fi
+if [ -z "$SOFTWARE_INVENTORY_JSON" ] || [ "$SOFTWARE_INVENTORY_JSON" = "null" ] || [ "$SOFTWARE_INVENTORY_JSON" = "[]" ]; then
+    # Pure-bash Linux software collection fallback
+    if command -v dpkg-query >/dev/null 2>&1; then
+        APPS_TMP=$(dpkg-query -W -f='{"name":"${Package}","version":"${Version}","publisher":"Debian/Ubuntu","install_date":"Unknown","size_mb":"Unknown"},' 2>/dev/null | head -n 150 | tr -d '\r\n')
+        [ -n "$APPS_TMP" ] && SOFTWARE_INVENTORY_JSON="[${APPS_TMP%,}]"
+    elif command -v rpm >/dev/null 2>&1; then
+        APPS_TMP=$(rpm -qa --qf '{"name":"%{NAME}","version":"%{VERSION}","publisher":"RedHat/RPM","install_date":"Unknown","size_mb":"Unknown"},' 2>/dev/null | head -n 150 | tr -d '\r\n')
+        [ -n "$APPS_TMP" ] && SOFTWARE_INVENTORY_JSON="[${APPS_TMP%,}]"
+    fi
 fi
 echo "Software scan complete."
 
@@ -768,7 +854,7 @@ try:
     lines = out.decode('utf-8', errors='replace').splitlines()
     for line in lines:
         line = line.strip()
-        if not line or line.startswith('wtmp') or line.startswith('utmp') or line.startswith('shutdown'):
+        if not line or line.startswith('wtmp') or line.startswith('utmp') or line.startswith('btmp'):
             continue
         parts = line.split()
         if len(parts) >= 4:
@@ -778,8 +864,8 @@ try:
                 domain = 'System Event'
                 logon_type = 'System Startup/Reboot'
             else:
-                domain = 'Local / macOS'
-                logon_type = 'Interactive / Console' if terminal == 'console' else 'TTY Session (' + terminal + ')'
+                domain = 'Local / Linux'
+                logon_type = 'Interactive Console' if terminal in ['console', 'tty1', ':0'] else ('TTY Session (' + terminal + ')')
             timestamp = ' '.join(parts[2:])
             logins.append({
                 'username': username,
@@ -789,12 +875,34 @@ try:
             })
 except Exception:
     pass
+
+if not logins:
+    try:
+        out = subprocess.check_output(['who'], stderr=open(os.devnull, 'w'))
+        for line in out.decode('utf-8', errors='replace').splitlines():
+            parts = line.split()
+            if len(parts) >= 3:
+                logins.append({
+                    'username': parts[0],
+                    'domain': 'Local Session',
+                    'logon_type': 'Console Session (' + parts[1] + ')',
+                    'timestamp': ' '.join(parts[2:])
+                })
+    except Exception:
+        pass
+
 print(json.dumps(logins))
 PYEOF
     )
 fi
-if [ -z "$LOGIN_HISTORY_JSON" ] || [ "$LOGIN_HISTORY_JSON" = "null" ]; then
-    LOGIN_HISTORY_JSON="[]"
+if [ -z "$LOGIN_HISTORY_JSON" ] || [ "$LOGIN_HISTORY_JSON" = "null" ] || [ "$LOGIN_HISTORY_JSON" = "[]" ]; then
+    # Pure-bash Linux login fallback
+    if command -v who >/dev/null 2>&1; then
+        WHO_TMP=$(who 2>/dev/null | head -n 10 | while read -r u t d t2; do
+            printf '{"username":"%s","domain":"Local Session","logon_type":"Console (%s)","timestamp":"%s %s"},' "$u" "$t" "$d" "$t2"
+        done)
+        [ -n "$WHO_TMP" ] && LOGIN_HISTORY_JSON="[${WHO_TMP%,}]"
+    fi
 fi
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -923,15 +1031,20 @@ API_URL="${TARGET_SERVER}/upload-audit?client_id=$CLIENT_ID"
 
 echo "Uploading secure payload to backend ($API_URL)..."
 
+TMP_JSON=$(mktemp 2>/dev/null || echo "/tmp/audit_payload_$$.json")
+printf '%s' "$JSON" > "$TMP_JSON"
+
 RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$API_URL" \
      -H "Content-Type: application/json" \
-     -d "$JSON")
+     --data-binary @"$TMP_JSON")
+
+rm -f "$TMP_JSON" 2>/dev/null
 
 HTTP_STATUS=$(echo "$RESPONSE" | tail -n1)
 # Use sed to strip last line — works on both macOS (BSD) and Linux (GNU)
 BODY=$(echo "$RESPONSE" | sed '$d')
 
-if [ "$HTTP_STATUS" -eq 200 ]; then
+if [ "$HTTP_STATUS" -eq 200 ] 2>/dev/null || [ "$HTTP_STATUS" = "200" ]; then
     echo "Audit upload completed successfully!"
 else
     echo "Upload failed. HTTP Status: $HTTP_STATUS"

@@ -407,13 +407,26 @@ if ($deviceType -eq "Laptop") {
 # ---------------------------------------------------------
 $userAccounts = @()
 try {
-    $users = Get-CimInstance Win32_UserAccount -Filter "LocalAccount=True"
+    $users = Get-CimInstance Win32_UserAccount -Filter "LocalAccount=True" -ErrorAction SilentlyContinue
+    $profiles = Get-CimInstance Win32_UserProfile -ErrorAction SilentlyContinue
+    $currentUser = $env:USERNAME
     foreach ($u in $users) {
+        $uName = Get-SafeString $u.Name
+        $prof = $profiles | Where-Object { $_.LocalPath -and $_.LocalPath.EndsWith("\$uName", [System.StringComparison]::OrdinalIgnoreCase) } | Select-Object -First 1
+        $homeDir = if ($prof) { Get-SafeString $prof.LocalPath } else { "C:\Users\$uName" }
+        $lastLog = if ($prof -and $prof.LastUseTime) { $prof.LastUseTime.ToString("yyyy-MM-dd HH:mm:ss") } else { "Unknown" }
+        $isCurrent = if ($uName -ieq $currentUser) { "True" } else { "False" }
+        $uType = if ($u.SID -like "*-500" -or $u.AccountType -eq 512) { "Local Administrator" } else { "Local User" }
+        
         $userAccounts += @{
-            name       = Get-SafeString $u.Name
-            disabled   = if ($u.Disabled) { "True" } else { "False" }
-            last_login = "Unknown"
-            logon_type = "Local"
+            name             = $uName
+            disabled         = if ($u.Disabled) { "True" } else { "False" }
+            home_directory   = $homeDir
+            last_login       = $lastLog
+            licensed         = "Yes"
+            number_of_logins = "1"
+            user_type        = $uType
+            current_user     = $isCurrent
         }
     }
 } catch {}
