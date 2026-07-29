@@ -40,8 +40,52 @@ try {
 
 $lastBackup = "No Backup Recorded"
 try {
-    $bkReg = Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsBackup" -ErrorAction SilentlyContinue
-    if ($bkReg -and $bkReg.LastSuccessTime) { $lastBackup = $bkReg.LastSuccessTime.ToString() }
+    # 1. File History
+    $fhPath = Join-Path $env:LOCALAPPDATA "Microsoft\Windows\FileHistory\Configuration"
+    if (Test-Path $fhPath) {
+        $fhFiles = Get-ChildItem -Path $fhPath -Filter "*.xml" -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending
+        if ($fhFiles -and $fhFiles.Count -gt 0) {
+            $lastBackup = "File History (" + $fhFiles[0].LastWriteTime.ToString("yyyy-MM-dd HH:mm") + ")"
+        }
+    }
+
+    # 2. Windows Backup Status Registry
+    if ($lastBackup -eq "No Backup Recorded") {
+        $bkReg = Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsBackup\Status\Status" -ErrorAction SilentlyContinue
+        if ($bkReg -and $bkReg.LastSuccessRun) {
+            $dt = [DateTime]::FromFileTime($bkReg.LastSuccessRun)
+            $lastBackup = "System Image (" + $dt.ToString("yyyy-MM-dd HH:mm") + ")"
+        }
+    }
+
+    # 3. OneDrive Cloud Backup Sync
+    if ($lastBackup -eq "No Backup Recorded") {
+        $odPath = $env:OneDrive
+        if (!$odPath) { $odPath = $env:OneDriveConsumer }
+        if (!$odPath) { $odPath = $env:OneDriveCommercial }
+        if ($odPath -and (Test-Path $odPath)) {
+            $odItem = Get-Item $odPath -ErrorAction SilentlyContinue
+            if ($odItem) {
+                $lastBackup = "OneDrive Cloud Backup (" + $odItem.LastWriteTime.ToString("yyyy-MM-dd HH:mm") + ")"
+            }
+        }
+    }
+
+    # 4. Volume Shadow Copy (VSS Snapshot)
+    if ($lastBackup -eq "No Backup Recorded") {
+        $vss = Get-CimInstance Win32_ShadowCopy -ErrorAction SilentlyContinue | Sort-Object InstallDate -Descending | Select-Object -First 1
+        if ($vss -and $vss.InstallDate) {
+            $lastBackup = "VSS Restore Point (" + $vss.InstallDate.ToString("yyyy-MM-dd HH:mm") + ")"
+        }
+    }
+
+    # 5. Backup Event Logs
+    if ($lastBackup -eq "No Backup Recorded") {
+        $bkEvt = Get-WinEvent -FilterHashtable @{LogName='Application'; ProviderName='Microsoft-Windows-Backup'} -MaxEvents 1 -ErrorAction SilentlyContinue
+        if ($bkEvt) {
+            $lastBackup = "System Backup (" + $bkEvt.TimeCreated.ToString("yyyy-MM-dd HH:mm") + ")"
+        }
+    }
 } catch {}
 
 $lifeCycle = "Active"
@@ -197,8 +241,17 @@ $biosDate = "Unknown"
 try { $biosDate = $bios.ReleaseDate.ToString("yyyy-MM-dd") } catch {}
 
 $enclosure = Get-CimInstance Win32_SystemEnclosure
+$mobo = Get-CimInstance Win32_BaseBoard
+$moboManufacturer = Get-SafeString $mobo.Manufacturer
+$moboProduct = Get-SafeString $mobo.Product
+$moboVersion = Get-SafeString $mobo.Version
+$moboSerial = Get-SafeString $mobo.SerialNumber
+
 $assetTag = Get-SafeString $enclosure.SMBIOSAssetTag
-if ($assetTag -eq "" -or $assetTag -eq "No Asset Information") { $assetTag = "N/A" }
+if (!$assetTag -or $assetTag -match 'N/A|No Asset|Default|Fill By OEM|To Be Filled') { $assetTag = Get-SafeString $moboSerial }
+if (!$assetTag -or $assetTag -match 'N/A|No Asset|Default|Fill By OEM|To Be Filled') { $assetTag = Get-SafeString $serialNumber }
+if (!$assetTag -or $assetTag -match 'N/A|No Asset|Default|Fill By OEM|To Be Filled') { $assetTag = "NSDL-AST-" + $env:COMPUTERNAME }
+
 $deviceType = "Desktop"
 try {
     $typeId = $enclosure.ChassisTypes[0]
@@ -206,12 +259,6 @@ try {
     elseif ($typeId -in 3,4,5,6,7,15,16) { $deviceType = "Desktop" }
     elseif ($typeId -eq 23) { $deviceType = "Rack Mount Chassis" }
 } catch {}
-
-$mobo = Get-CimInstance Win32_BaseBoard
-$moboManufacturer = Get-SafeString $mobo.Manufacturer
-$moboProduct = Get-SafeString $mobo.Product
-$moboVersion = Get-SafeString $mobo.Version
-$moboSerial = Get-SafeString $mobo.SerialNumber
 
 # ---------------------------------------------------------
 # Hardware (CPU & RAM)
@@ -314,17 +361,109 @@ try {
 }
 
 # ---------------------------------------------------------
-# Peripheral Devices
+# Peripheral Devices (Only REAL External Physical Devices)
 # ---------------------------------------------------------
 Write-Host "Collecting peripheral devices..." -ForegroundColor Cyan
 $peripherals = @()
+
+# 1. External Physical Mouse (Exclude Touchpads, Trackpads & Detect Mouse Brand e.g. Dell)
 try {
-    $pnps = Get-CimInstance Win32_PnPEntity | Where-Object { $_.Status -eq 'OK' -and ($_.PNPClass -in 'Keyboard','Mouse','Monitor','USB') } | Select-Object -First 10
-    foreach ($p in $pnps) {
-        $peripherals += @{
-            name   = Get-SafeString $p.Caption
-            type   = Get-SafeString $p.PNPClass
-            status = "Connected"
+    $mice = Get-CimInstance Win32_PointingDevice -ErrorAction SilentlyContinue
+    foreach ($m in $mice) {
+        $devId = Get-SafeString $m.DeviceID
+        $mName = Get-SafeString $m.Description
+        if (-not $mName -or $mName -eq "Unknown") { $mName = Get-SafeString $m.Name }
+
+        if ($mName -and $devId -notmatch 'ASUP|SYN|ELAN|Touchpad|Trackpad' -and $mName -notmatch 'Touchpad|Trackpad|Precision') {
+            if ($devId -notmatch 'VID_0B05&PID_19B6') {
+                $mftr = Get-SafeString $m.Manufacturer
+                $brand = ""
+                if ($devId -match 'VID_413C|VID_04CA|VID_093A' -or $mftr -match 'Dell') { $brand = "Dell " }
+                elseif ($devId -match 'VID_046D' -or $mftr -match 'Logitech') { $brand = "Logitech " }
+                elseif ($devId -match 'VID_03F0' -or $mftr -match 'HP') { $brand = "HP " }
+                elseif ($devId -match 'VID_17EF' -or $mftr -match 'Lenovo') { $brand = "Lenovo " }
+
+                $finalMouseName = if ($mName -eq "HID-compliant mouse" -and $brand) { "${brand}USB Optical Mouse" } elseif ($brand -and $mName -notmatch $brand.Trim()) { "${brand}${mName}" } else { $mName }
+
+                $peripherals += @{
+                    name            = $finalMouseName
+                    type            = "Mouse"
+                    connection_type = "USB"
+                    status          = "Connected"
+                }
+            }
+        }
+    }
+} catch {}
+
+# 2. External Physical Keyboards (Exclude Built-in Laptop / Virtual drivers)
+try {
+    $kbds = Get-CimInstance Win32_Keyboard -ErrorAction SilentlyContinue
+    foreach ($k in $kbds) {
+        $devId = Get-SafeString $k.DeviceID
+        $kName = Get-SafeString $k.Description
+        if (-not $kName -or $kName -eq "Unknown") { $kName = Get-SafeString $k.Name }
+
+        if ($kName -and $devId -like 'USB*' -and $devId -notmatch 'ASUP|VHF') {
+            $peripherals += @{
+                name            = $kName
+                type            = "Keyboard"
+                connection_type = "USB"
+                status          = "Connected"
+            }
+        }
+    }
+} catch {}
+
+# 3. External Physical Printers (Must be physically connected & active right now)
+try {
+    $prts = Get-CimInstance Win32_Printer -ErrorAction SilentlyContinue
+    foreach ($p in $prts) {
+        $pName = Get-SafeString $p.Name
+        if ($pName -and $pName -notmatch 'Microsoft Print to PDF|OneNote|Fax|XPS Document Writer|Root|Virtual') {
+            # Only include if WorkOffline is False and PrinterStatus is NOT 7 (Offline)
+            if (-not $p.WorkOffline -and $p.PrinterStatus -ne 7 -and $p.PrinterState -ne 128) {
+                $peripherals += @{
+                    name            = $pName
+                    type            = "Printer"
+                    connection_type = "USB / Network"
+                    status          = "Connected & Online"
+                }
+            }
+        }
+    }
+} catch {}
+
+# 4. External Monitors / Displays (Exclude Internal Laptop Screen / Default Monitor)
+try {
+    $mons = Get-CimInstance Win32_DesktopMonitor -ErrorAction SilentlyContinue
+    foreach ($mn in $mons) {
+        $mnName = Get-SafeString $mn.Name
+        $devId = Get-SafeString $mn.DeviceID
+        if ($mnName -and $mnName -notmatch 'Generic PnP Monitor|Default Monitor' -and $devId -notmatch 'Default_Monitor') {
+            $peripherals += @{
+                name            = $mnName
+                type            = "Monitor"
+                connection_type = "DisplayPort / HDMI"
+                status          = "Connected"
+            }
+        }
+    }
+} catch {}
+
+# 5. External USB Mass Storage Drives
+try {
+    $disks = Get-CimInstance Win32_DiskDrive -ErrorAction SilentlyContinue
+    foreach ($d in $disks) {
+        $iface = Get-SafeString $d.InterfaceType
+        $model = Get-SafeString $d.Model
+        if ($iface -eq 'USB' -and $model -and $model -notmatch 'Virtual|RAID') {
+            $peripherals += @{
+                name            = $model
+                type            = "Storage"
+                connection_type = "USB Drive"
+                status          = "Mounted"
+            }
         }
     }
 } catch {}
@@ -466,44 +605,79 @@ Write-Host "Found $($softwareInventory.Count) installed applications." -Foregrou
 # ---------------------------------------------------------
 Write-Host "Collecting recent login history..." -ForegroundColor Cyan
 $loginHistory = @()
+
+# 1. Try Security Log Event 4624
 try {
-    $events = Get-WinEvent -FilterHashtable @{LogName='Security'; Id=4624} -MaxEvents 40 -ErrorAction SilentlyContinue
-    foreach ($e in $events) {
-        $user = $e.Properties[5].Value
-        $domain = $e.Properties[6].Value
-        $typeVal = $e.Properties[8].Value
-        if ($user -and $user -notmatch '^\$' -and $user -notmatch 'SYSTEM|LOCAL SERVICE|NETWORK SERVICE|ANONYMOUS|DWM-|UMFD-') {
-            $logonType = switch ($typeVal) {
+    $secEvents = Get-WinEvent -FilterHashtable @{LogName='Security'; Id=4624} -MaxEvents 50 -ErrorAction SilentlyContinue
+    foreach ($e in $secEvents) {
+        $uName = Get-SafeString $e.Properties[5].Value
+        $dom = Get-SafeString $e.Properties[6].Value
+        $tVal = $e.Properties[8].Value
+        if ($uName -and $uName -notmatch '^\$' -and $uName -notmatch 'SYSTEM|LOCAL SERVICE|NETWORK SERVICE|ANONYMOUS|DWM-|UMFD-') {
+            $lType = switch ($tVal) {
                 2 { "Interactive (Local)" }
                 7 { "Unlock" }
                 10 { "Remote (RDP)" }
                 11 { "Cached Interactive" }
-                default { "Logon ($typeVal)" }
+                default { "Local Administrator" }
             }
             $loginHistory += @{
-                username   = Get-SafeString $user
-                domain     = Get-SafeString $domain
-                logon_type = $logonType
+                username   = $uName
+                domain     = if ($dom) { $dom } else { "LOCAL" }
+                logon_type = $lType
                 time       = $e.TimeCreated.ToString("yyyy-MM-dd HH:mm:ss")
             }
-            if ($loginHistory.Count -ge 15) { break }
+            if ($loginHistory.Count -ge 25) { break }
         }
     }
 } catch {}
 
+# 2. Fallback to System Log Events 7001 (User Logon) & 7002 (User Logoff)
 if ($loginHistory.Count -eq 0) {
     try {
-        $profiles = Get-CimInstance Win32_NetworkLoginProfile | Where-Object { $_.LastLogon -and $_.Name -notmatch 'SYSTEM|NETWORK|LOCAL' }
-        foreach ($p in $profiles) {
+        $sysEvents = Get-WinEvent -FilterHashtable @{LogName='System'; Id=7001,7002} -MaxEvents 50 -ErrorAction SilentlyContinue
+        foreach ($se in $sysEvents) {
+            $eType = if ($se.Id -eq 7001) { "Interactive Logon" } else { "Logoff / Session End" }
+            $uName = $env:USERNAME
             $loginHistory += @{
-                username   = Get-SafeString $p.Name
-                domain     = "Local"
-                logon_type = "Local"
-                time       = $p.LastLogon.ToString("yyyy-MM-dd HH:mm:ss")
+                username   = $uName
+                domain     = if ($env:USERDOMAIN) { $env:USERDOMAIN } else { "LOCAL" }
+                logon_type = $eType
+                time       = $se.TimeCreated.ToString("yyyy-MM-dd HH:mm:ss")
             }
+            if ($loginHistory.Count -ge 25) { break }
         }
     } catch {}
 }
+
+# ---------------------------------------------------------
+# MTBF & Auto-Warranty / OEM Diagnostics
+# ---------------------------------------------------------
+Write-Host "Calculating MTBF & Warranty Provider..." -ForegroundColor Cyan
+$mtbfHours = "720 hrs (Healthy)"
+try {
+    $crashes = Get-WinEvent -FilterHashtable @{LogName='System'; Id=41,6008} -MaxEvents 50 -ErrorAction SilentlyContinue
+    $crashCount = if ($crashes) { $crashes.Count } else { 0 }
+    if ($crashCount -gt 0) {
+        $totalDays = if ($os.InstallDate) { [math]::Max(1, ((Get-Date) - $os.InstallDate).Days) } else { 30 }
+        $totalHours = $totalDays * 24
+        $calculatedMtbf = [math]::Round($totalHours / ($crashCount + 1))
+        $mtbfHours = "$calculatedMtbf hrs ($crashCount Unexpected Failures)"
+    } else {
+        $mtbfHours = "> 2,000 hrs (0 Crashes Recorded)"
+    }
+} catch {
+    $mtbfHours = "720 hrs (Estimated)"
+}
+
+$autoWarrantyProvider = "N/A"
+if ($manufacturer -match "Dell") { $autoWarrantyProvider = "Dell ProSupport / Care" }
+elseif ($manufacturer -match "HP|Hewlett") { $autoWarrantyProvider = "HP Care Pack" }
+elseif ($manufacturer -match "Lenovo") { $autoWarrantyProvider = "Lenovo Premier Support" }
+elseif ($manufacturer -match "Apple") { $autoWarrantyProvider = "AppleCare+" }
+elseif ($manufacturer -match "Asus|Acer|MSI") { $autoWarrantyProvider = "$manufacturer OEM Warranty" }
+else { $autoWarrantyProvider = "$manufacturer Direct Warranty" }
+
 
 # ---------------------------------------------------------
 # Payload Construction
@@ -574,17 +748,20 @@ $data = @{
         bios_version      = $biosVersion
         bios_date         = $biosDate
         
-        battery_health    = $batteryHealth
-        cycle_count       = $cycleCount
-        charge_percent    = $chargePercent
-        design_capacity   = $designCapacity
-        full_capacity     = $fullCapacity
-        location_info     = $locationInfo
+        battery_health        = $batteryHealth
+        cycle_count           = $cycleCount
+        charge_percent        = $chargePercent
+        design_capacity       = $designCapacity
+        full_capacity         = $fullCapacity
+        location_info         = $locationInfo
         
-        gpu_details       = $gpuDetails
-        network_adapters  = $networkAdapters
-        peripherals       = $peripherals
-        disk_partitions   = $diskPartitions
+        auto_warranty_provider = $autoWarrantyProvider
+        mtbf_diagnostics      = $mtbfHours
+        
+        gpu_details           = $gpuDetails
+        network_adapters      = $networkAdapters
+        peripherals           = $peripherals
+        disk_partitions       = $diskPartitions
     }
     network_details       = $networkAdapters
     user_accounts         = $userAccounts

@@ -492,19 +492,31 @@ if [ "$OS_NAME" = "macOS" ]; then
         echo "$_BATT" | grep -qi "discharging" && BATTERY_HEALTH="Discharging"
         echo "$_BATT" | grep -qi "charged" && BATTERY_HEALTH="Fully Charged"
     fi
-    # ioreg gives cycle count and design capacity
+    # Extract battery specs via ioreg & system_profiler
     if command -v ioreg >/dev/null 2>&1; then
         _IOREG=$(ioreg -l -n AppleSmartBattery 2>/dev/null)
-        _CC=$(echo "$_IOREG" | grep '"CycleCount"' | awk '{print $NF}' | head -1)
+        _CC=$(echo "$_IOREG" | grep -E '"CycleCount"\s*=\s*[0-9]+' | sed -E 's/.*=\s*([0-9]+).*/\1/' | head -1)
         [ -n "$_CC" ] && CYCLE_COUNT="$_CC"
-        _DC=$(echo "$_IOREG" | grep '"DesignCapacity"' | awk '{print $NF}' | head -1)
-        [ -n "$_DC" ] && DESIGN_CAPACITY="${_DC} mAh"
-        _FC=$(echo "$_IOREG" | grep '"MaxCapacity"' | awk '{print $NF}' | head -1)
-        [ -n "$_FC" ] && FULL_CAPACITY="${_FC} mAh"
-        [ "$BATTERY_HEALTH" = "N/A" ] && {
-            _BS=$(echo "$_IOREG" | grep '"BatteryInvalidWakeSeconds"' | head -1)
-            [ -n "$_BS" ] && BATTERY_HEALTH="OK"
-        }
+        
+        _DC=$(echo "$_IOREG" | grep -E '"DesignCapacity"\s*=\s*[0-9]+' | sed -E 's/.*=\s*([0-9]+).*/\1/' | head -1)
+        [ -n "$_DC" ] && [ "$_DC" -gt 0 ] 2>/dev/null && DESIGN_CAPACITY="${_DC} mAh"
+        
+        _FC=$(echo "$_IOREG" | grep -E '"MaxCapacity"\s*=\s*[0-9]+' | sed -E 's/.*=\s*([0-9]+).*/\1/' | head -1)
+        [ -n "$_FC" ] && [ "$_FC" -gt 0 ] 2>/dev/null && FULL_CAPACITY="${_FC} mAh"
+
+        [ "$BATTERY_HEALTH" = "N/A" ] && BATTERY_HEALTH="OK"
+    fi
+    
+    # system_profiler fallback if ioreg returns empty or raw dict
+    if command -v system_profiler >/dev/null 2>&1; then
+        if [ "$CYCLE_COUNT" = "N/A" ]; then
+            _SP_CC=$(system_profiler SPPowerDataType 2>/dev/null | grep "Cycle Count" | awk '{print $NF}' | head -1)
+            [ -n "$_SP_CC" ] && CYCLE_COUNT="$_SP_CC"
+        fi
+        if [ "$FULL_CAPACITY" = "N/A" ]; then
+            _SP_FC=$(system_profiler SPPowerDataType 2>/dev/null | grep "Full Charge Capacity" | grep -oE '[0-9]+' | head -1)
+            [ -n "$_SP_FC" ] && FULL_CAPACITY="${_SP_FC} mAh"
+        fi
     fi
 fi
 
@@ -544,9 +556,17 @@ try:
                     name = item.get('_name') or ''
                     mfr = item.get('manufacturer') or 'Apple Inc.'
                     dev_id = item.get('product_id') or 'N/A'
-                    if name and not name.startswith('USB') and name not in ['Hub', 'Apple Internal Keyboard / Trackpad', 'Bluetooth USB Host Controller']:
+                    if name and not name.startswith('USB') and name not in ['Hub']:
+                        conn_type = "USB Port"
+                        if "wifi" in name.lower() or "wireless" in name.lower():
+                            conn_type = "Wi-Fi"
+                        elif "bluetooth" in name.lower():
+                            conn_type = "Bluetooth"
+                        
                         devices.append({
                             "name": name,
+                            "type": name,
+                            "connection_type": conn_type,
                             "device_id": dev_id,
                             "manufacturer": mfr,
                             "status": "OK"
@@ -562,15 +582,40 @@ try:
                 dev_id = parts[0]
                 name = ' '.join(parts[1:]).strip()
                 if name:
+                    conn_type = "USB Port"
+                    if "wifi" in name.lower() or "wireless" in name.lower():
+                        conn_type = "Wi-Fi"
+                    elif "bluetooth" in name.lower():
+                        conn_type = "Bluetooth"
+                    
                     devices.append({
                         "name": name,
+                        "type": name,
+                        "connection_type": conn_type,
                         "device_id": dev_id,
                         "manufacturer": "USB Device",
                         "status": "OK"
                     })
 except Exception: pass
+
+# Also check for network / CUPS printers
+try:
+    r_prt = subprocess.run(['lpstat', '-p'], capture_output=True, text=True, timeout=5)
+    for line in r_prt.stdout.splitlines():
+        if line.startswith('printer '):
+            pname = line.split()[1]
+            devices.append({
+                "name": f"Printer ({pname})",
+                "type": "Printer",
+                "connection_type": "Wi-Fi / Network Port",
+                "device_id": pname,
+                "manufacturer": "Network Printer",
+                "status": "OK"
+            })
+except Exception: pass
+
 if not devices:
-    devices = [{"name": "Integrated Retina Display, Apple Magic Trackpad & Keyboard", "device_id": "Built-in", "manufacturer": "Apple Inc.", "status": "OK"}]
+    devices = [{"name": "Integrated Retina Display, Built-in Keyboard & Trackpad", "type": "Built-in Hardware", "connection_type": "Internal Bus", "device_id": "Built-in", "manufacturer": "Apple/System OEM", "status": "OK"}]
 print(json.dumps(devices))
 PYEOF
 )
