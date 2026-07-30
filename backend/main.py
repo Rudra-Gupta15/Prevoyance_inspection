@@ -771,10 +771,9 @@ def upload_audit(data: AuditData, client_id: str = Query(None)):
     xml_path  = f"{USER_INFO_DIR}/audit_{cid}_{clean_name}_{timestamp}.xml"
 
     # INSERT TO DB INSTEAD OF SAVING JSON FILE
-    mac = data.mac_address
-    name = data.computer_name
-    os_name = data.os_name
-    ts = data.execution_datetime
+    # Record current server timestamp for real-time sorting
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    data.execution_datetime = ts
     
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute('''
