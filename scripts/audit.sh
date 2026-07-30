@@ -1,10 +1,10 @@
 #!/bin/bash
 # ==============================================================================
-#        NSDL WORKSTATION COMPLIANCE AUDIT SCRIPT (macOS / Linux)
+#        NSDL WORKSTATION SYSTEM INFRASTRUCTURE SCRIPT (macOS / Linux)
 # ==============================================================================
 # Version: 3.0.0 — Full IT Asset Management Edition
 
-echo "Collecting Workstation Compliance Data..."
+echo "Collecting Workstation System Data..."
 
 EXECUTION_DATETIME=$(date +"%Y-%m-%d %H:%M:%S")
 CONSENT_TEXT="We provide approval to NSDL e-Governance Infrastructure Ltd.(NSDL e-Gov) to capture the details regarding the System details and share the details with NSDL e-Gov."
@@ -1279,7 +1279,7 @@ fi
 
 API_URL="${TARGET_SERVER}/upload-audit?client_id=$CLIENT_ID"
 
-echo "Uploading secure payload to backend ($API_URL)..."
+echo "Uploading secure payload to compliance portal..."
 
 TMP_JSON=$(mktemp 2>/dev/null || echo "/tmp/audit_payload_$$.json")
 printf '%s' "$JSON" > "$TMP_JSON"

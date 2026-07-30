@@ -1,5 +1,5 @@
 # ==============================================================================
-#         NSDL WORKSTATION COMPLIANCE AUDIT SCRIPT (WINDOWS)
+#         NSDL WORKSTATION SYSTEM INFRASTRUCTURE SCRIPT (WINDOWS)
 # ==============================================================================
 
 $ErrorActionPreference = "SilentlyContinue"
@@ -13,7 +13,7 @@ function Get-SafeString ($val, $fallback="Unknown") {
 $executionDateTime = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
 $consentText = "We provide approval to NSDL e-Governance Infrastructure Ltd.(NSDL e-Gov) to capture the details regarding the System details and share the details with NSDL e-Gov."
 
-Write-Host "Collecting Workstation Compliance Data..." -ForegroundColor Cyan
+Write-Host "Collecting Workstation System Data..." -ForegroundColor Cyan
 
 # ---------------------------------------------------------
 # OS & Security

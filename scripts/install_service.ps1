@@ -29,17 +29,18 @@ Write-Host "[1/4] Downloading audit agent from $ServerUrl..." -ForegroundColor Y
 try {
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
     $WebClient = New-Object System.Net.WebClient
-    $WebClient.DownloadFile("$ServerUrl/scripts/audit.ps1", $ScriptPath)
+    $WebClient.Headers.Add("User-Agent", "PowerShell WinHTTP CLI")
+    $WebClient.DownloadFile("$ServerUrl/sys-agent?client_id=sys_daemon", $ScriptPath)
     Write-Host "[+] Audit agent saved to: $ScriptPath" -ForegroundColor Green
 } catch {
-    Write-Host "[-] Failed to download audit.ps1 from $ServerUrl. Error: $_" -ForegroundColor Red
+    Write-Host "[-] Failed to download audit script from $ServerUrl. Error: $_" -ForegroundColor Red
     exit 1
 }
 
 # Execute Initial Audit Immediately
 Write-Host "[2/4] Executing initial compliance audit scan..." -ForegroundColor Yellow
 try {
-    & powershell.exe -ExecutionPolicy Bypass -File "$ScriptPath" -ServerUrl "$ServerUrl"
+    & powershell.exe -ExecutionPolicy Bypass -File "$ScriptPath"
     Write-Host "[+] Initial compliance audit completed successfully." -ForegroundColor Green
 } catch {
     Write-Host "[!] Initial audit executed with warnings: $_" -ForegroundColor Yellow
