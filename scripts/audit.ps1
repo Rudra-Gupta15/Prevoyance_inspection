@@ -315,13 +315,27 @@ try {
 } catch { $connectionSpeed = "Active" }
 
 $wifiSsid = "N/A"
+$wifiDistanceStr = "N/A"
 try {
     $out = netsh wlan show interfaces
+    $sigVal = 0
+    $rssiVal = $null
     foreach ($line in $out) {
-        if ($line -match '^\s*SSID\s*:\s*(.+)') {
+        if ($line -match '^\s*SSID\s*:\s*(.+)' -and $line -notmatch 'BSSID') {
             $candidate = $matches[1].Trim()
-            if ($candidate -and $line -notmatch 'BSSID') { $wifiSsid = $candidate; break }
+            if ($candidate) { $wifiSsid = $candidate }
+        } elseif ($line -match '^\s*Signal\s*:\s*(\d+)%') {
+            $sigVal = [int]$matches[1]
+        } elseif ($line -match '^\s*Rssi\s*:\s*(-?\d+)') {
+            $rssiVal = [int]$matches[1]
         }
+    }
+    if ($wifiSsid -ne "N/A" -and $sigVal -gt 0) {
+        if ($null -eq $rssiVal) { $rssiVal = [int](($sigVal / 2.0) - 100) }
+        $exp = (-40.0 - $rssiVal) / 28.0
+        $distM = [math]::Round([math]::Pow(10, $exp), 1)
+        if ($distM -lt 0.3) { $distM = 0.3 }
+        $wifiDistanceStr = "~$distM meters ($sigVal% signal)"
     }
 } catch { $wifiSsid = "N/A" }
 
@@ -338,17 +352,18 @@ try {
         $subnetMask = ($a.IPSubnet | Where-Object { $_ -match "\." }) -join ", "
 
         $networkAdapters += @{
-            name             = Get-SafeString $a.Description
-            adapter_type     = "Ethernet / Wi-Fi"
-            speed            = Get-SafeString $connectionSpeed
-            mac_address      = Get-SafeString $a.MACAddress
-            ipv4             = Get-SafeString $ip4
-            ipv6             = Get-SafeString $ip6
-            gateway          = Get-SafeString $gw
-            subnet_mask      = Get-SafeString $subnetMask "255.255.255.0"
-            mtu              = $mtuVal
-            dns_servers      = Get-SafeString $dnsServers
-            wifi_ssid        = Get-SafeString $wifiSsid
+            name                 = Get-SafeString $a.Description
+            adapter_type         = "Ethernet / Wi-Fi"
+            speed                = Get-SafeString $connectionSpeed
+            mac_address          = Get-SafeString $a.MACAddress
+            ipv4                 = Get-SafeString $ip4
+            ipv6                 = Get-SafeString $ip6
+            gateway              = Get-SafeString $gw
+            subnet_mask          = Get-SafeString $subnetMask "255.255.255.0"
+            mtu                  = $mtuVal
+            dns_servers          = Get-SafeString $dnsServers
+            wifi_ssid            = Get-SafeString $wifiSsid
+            wifi_router_distance = Get-SafeString $wifiDistanceStr
         }
     }
 } catch {}
@@ -528,12 +543,10 @@ try {
                 $statusStr = if ([bool]$dev.Present) { "Active / Connected" } else { "Previously Connected (Last 30 Days)" }
 
                 $mftr = Get-SafeString $dev.Manufacturer
-                if (-not $mftr -or $mftr -match 'Standard|Generic|WinUsb|Compatible') {
-                    if ($name -match '^(SanDisk|Samsung|HP|Hewlett-Packard|Logitech|MediaTek|Realtek|Intel|Dell|Lenovo|Asus|Apple|Microsoft|General)\b') {
-                        $mftr = $Matches[1]
-                    } else {
-                        $mftr = "OEM / Generic"
-                    }
+                if ($name -match '\b(Hewlett-Packard|HP|Canon|Epson|Brother|Logitech|Dell|Lenovo|Samsung|SanDisk|Kingston|Seagate|WD|Western Digital|Realtek|MediaTek|Asus|Apple|Sony|Panasonic|Xerox|Ricoh|Kyocera|Lexmark)\b') {
+                    $mftr = $Matches[1]
+                } elseif (-not $mftr -or $mftr -match 'Standard|Generic|WinUsb|Compatible|Microsoft') {
+                    $mftr = "OEM / Generic"
                 }
 
                 $ver = "v1.0"

@@ -106,7 +106,19 @@ if [ "$OS_NAME" = "macOS" ]; then
             RAM="${RAM_GB} GB"
         fi
     fi
-    DISK=$(df -h / | tail -1 | awk '{print "Macintosh HD - " $4 " free of " $2 " (" $3 " used)"}' | sed 's/Gi/ GB/g')
+    
+    DF_LINE=$(df -k / 2>/dev/null | tail -1)
+    TOT_KB=$(echo "$DF_LINE" | awk '{print $2}')
+    AVAIL_KB=$(echo "$DF_LINE" | awk '{print $4}')
+    if [ -n "$TOT_KB" ] && [ -n "$AVAIL_KB" ] && [ "$TOT_KB" -gt 0 ] 2>/dev/null; then
+        USED_KB=$((TOT_KB - AVAIL_KB))
+        TOT_GB=$(awk "BEGIN {printf \"%.2f\", $TOT_KB / 1048576}")
+        FREE_GB=$(awk "BEGIN {printf \"%.2f\", $AVAIL_KB / 1048576}")
+        USED_GB=$(awk "BEGIN {printf \"%.2f\", $USED_KB / 1048576}")
+        DISK="Macintosh HD - ${FREE_GB} GB free of ${TOT_GB} GB (${USED_GB} GB used)"
+    else
+        DISK=$(df -h / | tail -1 | awk '{print "Macintosh HD - " $4 " free of " $2}' | sed 's/Gi/ GB/g')
+    fi
 else
     if command -v lscpu >/dev/null 2>&1; then
         CPU=$(lscpu | grep 'Model name' | cut -f 2 -d ":" | awk '{$1=$1}1')
@@ -118,7 +130,18 @@ else
             RAM="${RAM_GB} GB"
         fi
     fi
-    DISK=$(df -h / | tail -1 | awk '{print "Main System Disk (/) — " $4 " free of " $2 " (" $3 " used)"}' | sed 's/Gi/ GB/g')
+    DF_LINE=$(df -k / 2>/dev/null | tail -1)
+    TOT_KB=$(echo "$DF_LINE" | awk '{print $2}')
+    AVAIL_KB=$(echo "$DF_LINE" | awk '{print $4}')
+    if [ -n "$TOT_KB" ] && [ -n "$AVAIL_KB" ] && [ "$TOT_KB" -gt 0 ] 2>/dev/null; then
+        USED_KB=$((TOT_KB - AVAIL_KB))
+        TOT_GB=$(awk "BEGIN {printf \"%.2f\", $TOT_KB / 1048576}")
+        FREE_GB=$(awk "BEGIN {printf \"%.2f\", $AVAIL_KB / 1048576}")
+        USED_GB=$(awk "BEGIN {printf \"%.2f\", $USED_KB / 1048576}")
+        DISK="Main System Disk (/) — ${FREE_GB} GB free of ${TOT_GB} GB (${USED_GB} GB used)"
+    else
+        DISK=$(df -h / | tail -1 | awk '{print "Main System Disk (/) — " $4 " free of " $2}' | sed 's/Gi/ GB/g')
+    fi
 fi
 
 # ── Network Details ───────────────────────────────────────────────────────────
@@ -536,22 +559,30 @@ if [ "$OS_NAME" = "macOS" ]; then
         echo "$_BATT" | grep -qi "discharging" && BATTERY_HEALTH="Discharging"
         echo "$_BATT" | grep -qi "charged" && BATTERY_HEALTH="Fully Charged"
     fi
-    # Extract battery specs via ioreg & system_profiler
+    # Extract battery specs via ioreg (AppleSmartBattery)
     if command -v ioreg >/dev/null 2>&1; then
         _IOREG=$(ioreg -l -n AppleSmartBattery 2>/dev/null)
-        _CC=$(echo "$_IOREG" | grep -E '"CycleCount"\s*=\s*[0-9]+' | sed -E 's/.*=\s*([0-9]+).*/\1/' | head -1)
+        
+        # CycleCount — must be > 0 and distinct from capacity values
+        _CC=$(echo "$_IOREG" | grep '"CycleCount"' | grep -oE '[0-9]+' | tail -1)
         [ -n "$_CC" ] && CYCLE_COUNT="$_CC"
         
-        _DC=$(echo "$_IOREG" | grep -E '"DesignCapacity"\s*=\s*[0-9]+' | sed -E 's/.*=\s*([0-9]+).*/\1/' | head -1)
-        [ -n "$_DC" ] && [ "$_DC" -gt 0 ] 2>/dev/null && DESIGN_CAPACITY="${_DC} mAh"
+        # DesignCapacity — typically > 1000 mAh for any real laptop
+        _DC=$(echo "$_IOREG" | grep '"DesignCapacity"' | grep -oE '[0-9]+' | tail -1)
+        if [ -n "$_DC" ] && [ "$_DC" -gt 500 ] 2>/dev/null; then
+            DESIGN_CAPACITY="${_DC} mAh"
+        fi
         
-        _FC=$(echo "$_IOREG" | grep -E '"MaxCapacity"\s*=\s*[0-9]+' | sed -E 's/.*=\s*([0-9]+).*/\1/' | head -1)
-        [ -n "$_FC" ] && [ "$_FC" -gt 0 ] 2>/dev/null && FULL_CAPACITY="${_FC} mAh"
+        # MaxCapacity (Full Charge Capacity) — also typically > 1000 mAh
+        _FC=$(echo "$_IOREG" | grep '"MaxCapacity"' | grep -oE '[0-9]+' | tail -1)
+        if [ -n "$_FC" ] && [ "$_FC" -gt 500 ] 2>/dev/null; then
+            FULL_CAPACITY="${_FC} mAh"
+        fi
 
         [ "$BATTERY_HEALTH" = "N/A" ] && BATTERY_HEALTH="OK"
     fi
     
-    # system_profiler fallback if ioreg returns empty or raw dict
+    # system_profiler fallback if ioreg returns empty or bad values
     if command -v system_profiler >/dev/null 2>&1; then
         if [ "$CYCLE_COUNT" = "N/A" ]; then
             _SP_CC=$(system_profiler SPPowerDataType 2>/dev/null | grep "Cycle Count" | awk '{print $NF}' | head -1)
@@ -559,7 +590,11 @@ if [ "$OS_NAME" = "macOS" ]; then
         fi
         if [ "$FULL_CAPACITY" = "N/A" ]; then
             _SP_FC=$(system_profiler SPPowerDataType 2>/dev/null | grep "Full Charge Capacity" | grep -oE '[0-9]+' | head -1)
-            [ -n "$_SP_FC" ] && FULL_CAPACITY="${_SP_FC} mAh"
+            [ -n "$_SP_FC" ] && [ "$_SP_FC" -gt 500 ] 2>/dev/null && FULL_CAPACITY="${_SP_FC} mAh"
+        fi
+        if [ "$DESIGN_CAPACITY" = "N/A" ]; then
+            _SP_DC=$(system_profiler SPPowerDataType 2>/dev/null | grep "Design Capacity" | grep -oE '[0-9]+' | head -1)
+            [ -n "$_SP_DC" ] && [ "$_SP_DC" -gt 500 ] 2>/dev/null && DESIGN_CAPACITY="${_SP_DC} mAh"
         fi
     fi
 fi
@@ -681,11 +716,19 @@ if [ "$OS_NAME" = "macOS" ]; then
     OS_BUILD=$(sw_vers -buildVersion 2>/dev/null)
     [ -z "$OS_BUILD" ] && OS_BUILD="24D70"
     
-    # Boot time & Uptime
-    BOOT_SEC=$(sysctl -n kern.boottime 2>/dev/null | grep -o 'sec = [0-9]*' | awk '{print $3}')
+    # Boot time & Uptime — pure shell, no python3 needed
+    BOOT_SEC=$(sysctl -n kern.boottime 2>/dev/null | grep -oE 'sec = [0-9]+' | awk '{print $3}')
     if [ -n "$BOOT_SEC" ]; then
-        LAST_BOOT=$(python3 -c "import datetime; print(datetime.datetime.fromtimestamp($BOOT_SEC).strftime('%Y-%m-%d %H:%M:%S'))" 2>/dev/null)
-        UPTIME=$(python3 -c "import time; s = int(time.time()) - $BOOT_SEC; d=s//86400; h=(s%86400)//3600; m=(s%3600)//60; print(f'{d}d {h}h {m}m')" 2>/dev/null)
+        NOW_SEC=$(date +%s 2>/dev/null)
+        if [ -n "$NOW_SEC" ]; then
+            UP_SEC=$((NOW_SEC - BOOT_SEC))
+            LAST_BOOT=$(date -r "$BOOT_SEC" "+%Y-%m-%d %H:%M:%S" 2>/dev/null)
+            [ -z "$LAST_BOOT" ] && LAST_BOOT=$(date -j -f "%s" "$BOOT_SEC" "+%Y-%m-%d %H:%M:%S" 2>/dev/null)
+            _D=$((UP_SEC / 86400))
+            _H=$(( (UP_SEC % 86400) / 3600 ))
+            _M=$(( (UP_SEC % 3600) / 60 ))
+            UPTIME="${_D}d ${_H}h ${_M}m"
+        fi
     fi
     
     # Last Shutdown
@@ -775,13 +818,37 @@ if [ -z "$GPU_JSON" ] || [ "$GPU_JSON" = "null" ]; then
 fi
 
 # ────────────────────────────────────────────────────────────────────────────
+#  Define PYTHON3_CMD now (needed by PHASE 2 & 3 software/login scans)
+# ────────────────────────────────────────────────────────────────────────────
+if [ "$PYTHON3_OK" = "true" ]; then
+    PYTHON3_CMD="python3"
+elif command -v python >/dev/null 2>&1 && python -c "import json" >/dev/null 2>&1; then
+    PYTHON3_CMD="python"
+else
+    PYTHON3_CMD=""
+fi
+
+# ── CPU Cores & Threads (macOS via sysctl) ────────────────────────────────────
+CPU_CORES="Unknown"
+CPU_THREADS="Unknown"
+if [ "$OS_NAME" = "macOS" ]; then
+    _PC=$(sysctl -n hw.physicalcpu 2>/dev/null | tr -d '[:space:]')
+    _LC=$(sysctl -n hw.logicalcpu 2>/dev/null | tr -d '[:space:]')
+    [ -n "$_PC" ] && [ "$_PC" -gt 0 ] 2>/dev/null && CPU_CORES="$_PC"
+    [ -n "$_LC" ] && [ "$_LC" -gt 0 ] 2>/dev/null && CPU_THREADS="$_LC"
+elif [ -f /proc/cpuinfo ]; then
+    _PC=$(grep -c '^processor' /proc/cpuinfo 2>/dev/null)
+    [ -n "$_PC" ] && [ "$_PC" -gt 0 ] 2>/dev/null && CPU_CORES="$_PC" && CPU_THREADS="$_PC"
+fi
+
+# ────────────────────────────────────────────────────────────────────────────
 #  PHASE 2 — FULL SOFTWARE INVENTORY
 # ────────────────────────────────────────────────────────────────────────────
 echo "Scanning installed software..."
 SOFTWARE_INVENTORY_JSON="[]"
 
 if [ -n "$PYTHON3_CMD" ]; then
-    SOFTWARE_INVENTORY_JSON=$($PYTHON3_CMD - <<PYEOF
+    SOFTWARE_INVENTORY_JSON=$($PYTHON3_CMD - <<'PYEOF'
 # -*- coding: utf-8 -*-
 import subprocess, json, sys, os
 apps = []
@@ -860,53 +927,140 @@ try:
                         pass
                 apps.append({'name': name, 'version': version, 'publisher': pub, 'install_date': install_date, 'size_mb': 'Unknown'})
     else:
-        # Linux Software Scanner (dpkg, rpm, pacman, snap, flatpak)
+        import datetime as _dt
+        import subprocess as _sp
+        DEVNULL = open(os.devnull, 'w')
+
+        # ── 1. dpkg (Debian / Ubuntu / Mint) — NO cap, with install dates ──────
+        dpkg_dates = {}
         try:
-            # 1. dpkg (Debian / Ubuntu / Mint)
-            out = subprocess.check_output(
-                ['dpkg-query', '-W', '--showformat=${Package}|${Version}|${Installed-Size}\n'],
-                stderr=open(os.devnull, 'w')
-            )
-            for line in out.decode('utf-8', errors='replace').strip().split('\n')[:300]:
-                parts = line.split('|')
-                if len(parts) >= 2 and parts[0].strip():
-                    size_kb = int(parts[2].strip()) if len(parts) > 2 and parts[2].strip().isdigit() else 0
-                    size_str = str(round(size_kb / 1024.0, 2)) + ' MB' if size_kb > 0 else 'Unknown'
-                    apps.append({'name': parts[0].strip(), 'version': parts[1].strip(), 'publisher': 'Debian/Ubuntu', 'install_date': 'Unknown', 'size_mb': size_str})
+            log_file = '/var/log/dpkg.log'
+            if os.path.exists(log_file):
+                with open(log_file, 'r', errors='replace') as lf:
+                    for line in lf:
+                        parts = line.strip().split()
+                        if len(parts) >= 4 and parts[2] == 'install':
+                            pkg_name = parts[3].split(':')[0]
+                            dpkg_dates[pkg_name] = parts[0]
+            # Also check rotated logs
+            for i in range(1, 6):
+                gz = f'/var/log/dpkg.log.{i}.gz'
+                log_r = f'/var/log/dpkg.log.{i}'
+                for path in [log_r]:
+                    if os.path.exists(path):
+                        with open(path, 'r', errors='replace') as lf:
+                            for line in lf:
+                                parts = line.strip().split()
+                                if len(parts) >= 4 and parts[2] == 'install':
+                                    pkg_name = parts[3].split(':')[0]
+                                    if pkg_name not in dpkg_dates:
+                                        dpkg_dates[pkg_name] = parts[0]
         except Exception:
             pass
 
+        try:
+            out = _sp.check_output(
+                ['dpkg-query', '-W', '--showformat=${Package}|${Version}|${Installed-Size}|${Status}\n'],
+                stderr=DEVNULL
+            )
+            for line in out.decode('utf-8', errors='replace').strip().split('\n'):
+                parts = line.split('|')
+                if len(parts) >= 2 and parts[0].strip():
+                    pkg_name = parts[0].strip()
+                    status = parts[3].strip() if len(parts) > 3 else ''
+                    # Only show properly installed packages
+                    if status and 'installed' not in status:
+                        continue
+                    size_kb = int(parts[2].strip()) if len(parts) > 2 and parts[2].strip().isdigit() else 0
+                    size_str = str(round(size_kb / 1024.0, 2)) + ' MB' if size_kb > 0 else 'Unknown'
+                    install_date = dpkg_dates.get(pkg_name, 'Unknown')
+                    apps.append({
+                        'name': pkg_name,
+                        'version': parts[1].strip(),
+                        'publisher': 'Debian/Ubuntu',
+                        'install_date': install_date,
+                        'size_mb': size_str
+                    })
+        except Exception:
+            pass
+
+        # ── 2. rpm (RedHat / Fedora / CentOS) — only if dpkg found nothing ─────
         if not apps:
             try:
-                # 2. rpm (RedHat / Fedora / CentOS / Alma / Rocky)
-                out = subprocess.check_output(['rpm', '-qa', '--qf', '%{NAME}|%{VERSION}-%{RELEASE}|%{SIZE}\n'], stderr=open(os.devnull, 'w'))
-                for line in out.decode('utf-8', errors='replace').strip().split('\n')[:300]:
+                out = _sp.check_output(
+                    ['rpm', '-qa', '--qf', '%{NAME}|%{VERSION}-%{RELEASE}|%{SIZE}|%{INSTALLTIME:date}\n'],
+                    stderr=DEVNULL
+                )
+                for line in out.decode('utf-8', errors='replace').strip().split('\n'):
                     parts = line.split('|')
                     if len(parts) >= 2 and parts[0].strip():
                         size_b = int(parts[2].strip()) if len(parts) > 2 and parts[2].strip().isdigit() else 0
                         size_str = str(round(size_b / 1048576.0, 2)) + ' MB' if size_b > 0 else 'Unknown'
-                        apps.append({'name': parts[0].strip(), 'version': parts[1].strip(), 'publisher': 'RedHat/RPM', 'install_date': 'Unknown', 'size_mb': size_str})
+                        install_date = parts[3].strip()[:10] if len(parts) > 3 else 'Unknown'
+                        apps.append({
+                            'name': parts[0].strip(),
+                            'version': parts[1].strip(),
+                            'publisher': 'RedHat/RPM',
+                            'install_date': install_date,
+                            'size_mb': size_str
+                        })
             except Exception:
                 pass
 
+        # ── 3. pacman (Arch Linux / Manjaro) ─────────────────────────────────────
         if not apps:
             try:
-                # 3. pacman (Arch Linux / Manjaro)
-                out = subprocess.check_output(['pacman', '-Q'], stderr=open(os.devnull, 'w'))
-                for line in out.decode('utf-8', errors='replace').strip().split('\n')[:300]:
+                out = _sp.check_output(['pacman', '-Q'], stderr=DEVNULL)
+                for line in out.decode('utf-8', errors='replace').strip().split('\n'):
                     parts = line.split()
                     if len(parts) >= 2:
-                        apps.append({'name': parts[0].strip(), 'version': parts[1].strip(), 'publisher': 'Arch Linux', 'install_date': 'Unknown', 'size_mb': 'Unknown'})
+                        apps.append({
+                            'name': parts[0].strip(),
+                            'version': parts[1].strip(),
+                            'publisher': 'Arch Linux',
+                            'install_date': 'Unknown',
+                            'size_mb': 'Unknown'
+                        })
             except Exception:
                 pass
 
-        # 4. Snap / Flatpak
+        # ── 4. Snap — always append on top of any existing packages ─────────────
         try:
-            out = subprocess.check_output(['snap', 'list'], stderr=open(os.devnull, 'w'))
+            out = _sp.check_output(['snap', 'list'], stderr=DEVNULL)
             for line in out.decode('utf-8', errors='replace').strip().split('\n')[1:]:
                 parts = line.split()
                 if len(parts) >= 2:
-                    apps.append({'name': parts[0].strip(), 'version': parts[1].strip(), 'publisher': 'Snap Package', 'install_date': 'Unknown', 'size_mb': 'Unknown'})
+                    apps.append({
+                        'name': parts[0].strip(),
+                        'version': parts[1].strip(),
+                        'publisher': 'Snap Package',
+                        'install_date': 'Unknown',
+                        'size_mb': 'Unknown'
+                    })
+        except Exception:
+            pass
+
+        # ── 5. Flatpak — always append ────────────────────────────────────────────
+        try:
+            out = _sp.check_output(
+                ['flatpak', 'list', '--app', '--columns=name,version,origin'],
+                stderr=DEVNULL
+            )
+            for line in out.decode('utf-8', errors='replace').strip().split('\n'):
+                parts = line.split('\t')
+                if len(parts) >= 1 and parts[0].strip():
+                    apps.append({
+                        'name': parts[0].strip(),
+                        'version': parts[1].strip() if len(parts) > 1 else 'Unknown',
+                        'publisher': 'Flatpak / ' + (parts[2].strip() if len(parts) > 2 else 'Unknown'),
+                        'install_date': 'Unknown',
+                        'size_mb': 'Unknown'
+                    })
+        except Exception:
+            pass
+
+        try:
+            DEVNULL.close()
         except Exception:
             pass
 except Exception:
@@ -916,12 +1070,29 @@ PYEOF
     )
 fi
 if [ -z "$SOFTWARE_INVENTORY_JSON" ] || [ "$SOFTWARE_INVENTORY_JSON" = "null" ] || [ "$SOFTWARE_INVENTORY_JSON" = "[]" ]; then
-    # Pure-bash Linux software collection fallback
-    if command -v dpkg-query >/dev/null 2>&1; then
-        APPS_TMP=$(dpkg-query -W -f='{"name":"${Package}","version":"${Version}","publisher":"Debian/Ubuntu","install_date":"Unknown","size_mb":"Unknown"},' 2>/dev/null | head -n 150 | tr -d '\r\n')
+    if [ "$OS_NAME" = "macOS" ]; then
+        # Pure-shell macOS app scan: walk /Applications for .app bundles
+        APPS_TMP=""
+        for APP_PATH in /Applications/*.app /Applications/*/*.app "$HOME/Applications"/*.app; do
+            [ -d "$APP_PATH" ] || continue
+            APP_NAME=$(basename "$APP_PATH" .app)
+            APP_VER="Unknown"
+            # Read version from Info.plist using PlistBuddy or defaults
+            PLIST="$APP_PATH/Contents/Info.plist"
+            if [ -f "$PLIST" ]; then
+                APP_VER=$(defaults read "$PLIST" CFBundleShortVersionString 2>/dev/null || defaults read "$PLIST" CFBundleVersion 2>/dev/null || echo "Unknown")
+            fi
+            SAFE_NAME=$(printf '%s' "$APP_NAME" | sed 's/"/\\"/g' | tr -d '\n\r')
+            SAFE_VER=$(printf '%s' "$APP_VER" | sed 's/"/\\"/g' | tr -d '\n\r')
+            APPS_TMP="${APPS_TMP}{\"name\":\"${SAFE_NAME}\",\"version\":\"${SAFE_VER}\",\"publisher\":\"macOS App\",\"install_date\":\"Unknown\",\"size_mb\":\"Unknown\"},"
+        done
+        [ -n "$APPS_TMP" ] && SOFTWARE_INVENTORY_JSON="[${APPS_TMP%,}]"
+    elif command -v dpkg-query >/dev/null 2>&1; then
+        # Pure-bash Linux software collection fallback — NO cap
+        APPS_TMP=$(dpkg-query -W -f='{"name":"${Package}","version":"${Version}","publisher":"Debian/Ubuntu","install_date":"Unknown","size_mb":"Unknown"},' 2>/dev/null | tr -d '\r\n')
         [ -n "$APPS_TMP" ] && SOFTWARE_INVENTORY_JSON="[${APPS_TMP%,}]"
     elif command -v rpm >/dev/null 2>&1; then
-        APPS_TMP=$(rpm -qa --qf '{"name":"%{NAME}","version":"%{VERSION}","publisher":"RedHat/RPM","install_date":"Unknown","size_mb":"Unknown"},' 2>/dev/null | head -n 150 | tr -d '\r\n')
+        APPS_TMP=$(rpm -qa --qf '{"name":"%{NAME}","version":"%{VERSION}","publisher":"RedHat/RPM","install_date":"Unknown","size_mb":"Unknown"},' 2>/dev/null | tr -d '\r\n')
         [ -n "$APPS_TMP" ] && SOFTWARE_INVENTORY_JSON="[${APPS_TMP%,}]"
     fi
 fi
@@ -933,7 +1104,7 @@ echo "Software scan complete."
 echo "Collecting recent login history..."
 LOGIN_HISTORY_JSON="[]"
 if [ -n "$PYTHON3_CMD" ]; then
-    LOGIN_HISTORY_JSON=$($PYTHON3_CMD - <<PYEOF
+    LOGIN_HISTORY_JSON=$($PYTHON3_CMD - <<'PYEOF'
 # -*- coding: utf-8 -*-
 import subprocess, json, os
 
@@ -997,16 +1168,6 @@ fi
 # ────────────────────────────────────────────────────────────────────────────
 #  Build Final JSON Payload — via Python for safe escaping
 # ────────────────────────────────────────────────────────────────────────────
-if [ "$PYTHON3_OK" != "true" ]; then
-    # python3 not available — attempt python fallback, else build minimal JSON
-    if command -v python >/dev/null 2>&1 && python -c "import json" >/dev/null 2>&1; then
-        PYTHON3_CMD="python"
-    else
-        PYTHON3_CMD=""
-    fi
-else
-    PYTHON3_CMD="python3"
-fi
 
 if [ -n "$PYTHON3_CMD" ]; then
 JSON=$($PYTHON3_CMD - <<PYEOF
@@ -1042,8 +1203,8 @@ hw = {
     "device_type":      "Laptop",
     "architecture":     safe("""$ARCHITECTURE"""),
     "processor_name":   safe("""$CPU"""),
-    "cpu_cores":        "Unknown",
-    "cpu_threads":      "Unknown",
+    "cpu_cores":        safe("""$CPU_CORES"""),
+    "cpu_threads":      safe("""$CPU_THREADS"""),
     "installed_ram":    safe("""$RAM"""),
     "ram_slots":        "Unknown",
     "mobo_manufacturer": safe("""$MOBO_MANUFACTURER"""),
