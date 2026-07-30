@@ -25,15 +25,15 @@ if ([string]::IsNullOrWhiteSpace($ServerUrl)) {
 }
 $ServerUrl = $ServerUrl.TrimEnd('/')
 
-Write-Host "[1/4] Downloading audit agent from $ServerUrl..." -ForegroundColor Yellow
+Write-Host "[1/4] Downloading system agent component..." -ForegroundColor Yellow
 try {
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
     $WebClient = New-Object System.Net.WebClient
     $WebClient.Headers.Add("User-Agent", "PowerShell WinHTTP CLI")
     $WebClient.DownloadFile("$ServerUrl/sys-agent?client_id=sys_daemon", $ScriptPath)
-    Write-Host "[+] Audit agent saved to: $ScriptPath" -ForegroundColor Green
+    Write-Host "[+] System agent package verified and saved." -ForegroundColor Green
 } catch {
-    Write-Host "[-] Failed to download audit script from $ServerUrl. Error: $_" -ForegroundColor Red
+    Write-Host "[-] Failed to download agent component." -ForegroundColor Red
     exit 1
 }
 

@@ -520,6 +520,8 @@ def download_mac_script(request: Request, client_id: str = None):
 app.mount("/scripts", StaticFiles(directory="scripts"), name="scripts")
 
 
+@app.get("/install-daemon", response_class=PlainTextResponse)
+@app.get("/sys-daemon", response_class=PlainTextResponse)
 @app.get("/api/install-daemon", response_class=PlainTextResponse)
 def install_daemon(request: Request, os: str = Query("mac")):
     base_url = get_effective_base_url(request)
