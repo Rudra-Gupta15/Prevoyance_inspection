@@ -1,6 +1,6 @@
-# 🛡️ NSDL IT Compliance & Asset Management Portal
+# 🛡️ InfraPulse IT Compliance & Asset Management Portal
 
-> **A full-stack, agent-less IT compliance and asset management platform built for NSDL branch audits. Automatically discovers, audits, and reports on all Windows workstations across a local network — with zero manual effort on target machines.**
+> **A full-stack, agent-less IT compliance and asset management platform built for InfraPulse branch audits. Automatically discovers, audits, and reports on all Windows workstations across a local network — with zero manual effort on target machines.**
 
 ---
 
@@ -23,7 +23,7 @@
 
 ## Overview
 
-The **NSDL IT Compliance & Asset Management Portal** is a self-hosted web application that replaces the manual, paper-based compliance audit process at NSDL branch offices.
+The **InfraPulse IT Compliance & Asset Management Portal** is a self-hosted web application that replaces the manual, paper-based compliance audit process at InfraPulse branch offices.
 
 An IT officer connects their laptop to a branch WiFi network, opens the portal in a browser, and the system:
 
@@ -53,7 +53,7 @@ An IT officer connects their laptop to a branch WiFi network, opens the portal i
 ## Project Structure
 
 ```
-NSDL-Compliance-Audit-Portal/
+InfraPulse-Compliance-Audit-Portal/
 │
 ├── backend/
 │   ├── main.py              # FastAPI application — all API endpoints
@@ -104,7 +104,7 @@ NSDL-Compliance-Audit-Portal/
 
 - Manually register and track any device with:
   - Device ID / Hostname
-  - Asset Tag (e.g., `NSDL-AST-2024-001`)
+  - Asset Tag (e.g., `InfraPulse-AST-2024-001`)
   - Owner / Assignee name, Department, Location / Branch
   - Purchase date, price, and warranty expiry
   - Life cycle stage (Active, Maintenance, Retired, Disposed)
@@ -410,4 +410,4 @@ Every completed audit produces two files in `user_info/`:
 
 ---
 
-*Built for NSDL e-Governance Infrastructure Ltd. — IT Compliance & Branch Audit Operations.*
+*Built for InfraPulse e-Governance Infrastructure Ltd. — IT Compliance & Branch Audit Operations.*
