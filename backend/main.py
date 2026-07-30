@@ -774,6 +774,9 @@ def upload_audit(data: AuditData, client_id: str = Query(None)):
     # Record current server timestamp for real-time sorting
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     data.execution_datetime = ts
+    mac = data.mac_address
+    name = data.computer_name
+    os_name = data.os_name
     
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute('''
