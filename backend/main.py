@@ -1310,6 +1310,7 @@ def list_assets():
 # ==============================================================================
 # 8. AUDIT DEVICE & SOFTWARE QUERIES
 # ==============================================================================
+@app.get("/devices")
 @app.get("/api/devices")
 def list_audited_devices():
     devices = {}
@@ -2029,10 +2030,16 @@ def _run_cmd(cmd: str):
 
 
 @app.get("/wifi/networks")
+@app.get("/api/wifi/networks")
 def get_wifi_networks():
     """List nearby WiFi networks via netsh (Windows only)."""
     if not _is_windows():
-        raise HTTPException(status_code=501, detail="WiFi scanning is only supported on Windows.")
+        return {
+            "networks": [],
+            "total": 0,
+            "is_cloud_server": True,
+            "message": "WiFi Hardware Unavailable (Running on Cloud Linux Server). Local WiFi scanning requires hosting on a local Windows machine."
+        }
 
     stdout, _ = _run_cmd("netsh wlan show networks mode=bssid")
 
@@ -2119,6 +2126,9 @@ def calculate_wifi_distance(signal_percent: int = 0, rssi_dbm: int = None) -> di
 
 
 @app.get("/wifi/current")
+@app.get("/wifi-status")
+@app.get("/api/wifi-status")
+@app.get("/api/wifi/current")
 def get_current_wifi():
     """Return the current WiFi connection info including derived /24 subnet and router distance."""
     if not _is_windows():

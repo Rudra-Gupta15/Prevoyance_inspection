@@ -4766,10 +4766,17 @@
 
                                 try {
                                     const r = await fetch('/wifi/networks');
-                                    const data = await r.json();
+                                    let data = {};
+                                    try {
+                                        data = await r.json();
+                                    } catch(jsonErr) {
+                                        container.innerHTML = `<div class="empty-state"><h3>WiFi Scan Unavailable</h3><p>WiFi hardware scanning is supported when hosted on a local Windows machine.</p></div>`;
+                                        return;
+                                    }
 
-                                    if (!r.ok) {
-                                        container.innerHTML = `<div class="empty-state"><h3>Scan Failed</h3><p>${esc(data.detail || 'Could not scan networks. Windows required.')}</p></div>`;
+                                    if (!r.ok || data.is_cloud_server) {
+                                        const msg = data.is_cloud_server ? data.message : (data.detail || 'WiFi scanning is only supported on Windows.');
+                                        container.innerHTML = `<div class="empty-state"><h3>WiFi Scan Unavailable</h3><p>${esc(msg)}</p></div>`;
                                         return;
                                     }
 
