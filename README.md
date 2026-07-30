@@ -1,413 +1,164 @@
-# 🛡️ InfraPulse IT Compliance & Asset Management Portal
+# 🛡️ InfraPulse — Automated IT Compliance & Asset Inspection Portal
 
-> **A full-stack, agent-less IT compliance and asset management platform built for InfraPulse branch audits. Automatically discovers, audits, and reports on all Windows workstations across a local network — with zero manual effort on target machines.**
+> **Developed by Prevoyance IT Solutions**  
+> *A full-stack, enterprise-grade IT compliance auditing and asset management platform. Discovers, inspects, and generates structured compliance reports for Windows, macOS, and Linux workstations across local networks and remote internet locations — with zero manual configuration.*
 
 ---
 
 ## 📋 Table of Contents
 
-- [Overview](#overview)
-- [Tech Stack](#tech-stack)mo
-- [Project Structure](#project-structure)
-- [Core Features](#core-features)
-- [System Architecture](#system-architecture)
-- [Audit Workflow](#audit-workflow)
-- [Network Discovery Workflow](#network-discovery-workflow)
-- [WiFi Management Workflow](#wifi-management-workflow)
-- [Data Flow Diagram](#data-flow-diagram)
-- [API Reference](#api-reference)
-- [Setup & Running](#setup--running)
-- [Security & Permissions](#security--permissions)
+1. [Project Name](#-project-name)
+2. [Overview](#-overview)
+3. [Problem Statement](#-problem-statement)
+4. [Key Features](#-key-features)
+5. [Tech Stack](#-tech-stack)
+6. [Installation & Execution Guide (Step-by-Step for All 3 OS)](#-installation--execution-guide-step-by-step-for-all-3-os)
+   - [Windows (.exe / .vbs)](#1-windows-setup--execution-exe--vbs)
+   - [macOS (.command)](#2-macos-setup--execution-command)
+   - [Linux (.sh)](#3-linux-setup--execution-sh)
+7. [User Guide (How to Use the Portal)](#-user-guide-how-to-use-the-portal)
+8. [Important Testing Note](#-testing-note)
 
 ---
 
-## Overview
+## 🏷️ Project Name
 
-The **InfraPulse IT Compliance & Asset Management Portal** is a self-hosted web application that replaces the manual, paper-based compliance audit process at InfraPulse branch offices.
-
-An IT officer connects their laptop to a branch WiFi network, opens the portal in a browser, and the system:
-
-1. **Discovers** all live devices on the subnet automatically.
-2. **Identifies** Windows workstations, mobiles, printers, and unknown devices.
-3. **Audits** each Windows machine — collecting hardware specs, software inventory, login history, antivirus status, hotfixes, and more.
-4. **Generates** a structured PDF inspection report and JSON data file.
-5. **Displays** all collected data in a rich, interactive dashboard.
+**InfraPulse: Enterprise IT Compliance Audit & Asset Inspection System**  
+*Product by:* **Prevoyance IT Solutions**
 
 ---
 
-## Tech Stack
+## 🌐 Overview
 
-| Layer | Technology | Purpose |
+The **InfraPulse IT Compliance Portal** is a centralized, self-hosted audit solution engineered by **Prevoyance IT Solutions**. It automates system inventory collection, hardware verification, software auditing, security policy inspection, and compliance report generation across all workstation operating systems (Windows, macOS, Linux).
+
+Whether laptops are connected on the same local Wi-Fi router or operating remotely from home offices across different cities, InfraPulse allows IT administrators and auditors to gather instant, tamper-proof hardware/software inspection reports in seconds.
+
+---
+
+## 🎯 Problem Statement
+
+Traditional IT compliance audits at branch offices and corporate workstations face major operational hurdles:
+
+1. **Time-Consuming Manual Audits**: IT engineers have to physically log into every employee laptop, run commands, check control panel software, and write manual Excel reports.
+2. **Remote & Work-From-Home Invisibility**: Laptops operating outside the local office network or on different Wi-Fi routers cannot be scanned using standard local IP range tools.
+3. **Complex Terminal Commands for Non-Technical Staff**: Employees are reluctant or unable to open PowerShell/Terminal to run raw CLI commands.
+4. **Data Security & Link Exposure**: Standard audit scripts expose backend IP addresses and sensitive API endpoints in plain text inside terminals or browsers.
+5. **Lack of Automated Change Tracking**: Difficulty in identifying when an employee installs unauthorized software or replaces a RAM module/hard drive between quarterly audits.
+
+**InfraPulse solves every single one of these problems with 1-click double-clickable launchers, Base64 stealth obfuscation, multi-OS support, real-time cloud tunnels, and automated PDF compliance reports.**
+
+---
+
+## 🚀 Key Features
+
+* 🪟 🍎 🐧 **Cross-Platform Support**: Seamlessly audits **Windows 10/11**, **macOS (Intel & Apple Silicon)**, and **Linux (Ubuntu, Debian, RHEL, WSL)**.
+* 🖱️ **1-Click Native Executable Launchers**: Downloadable double-clickable files (**`.exe`** for Windows, **`.command`** for macOS Finder, **`.sh`** for Linux Desktop) so users never have to touch a terminal.
+* 🔒 **Stealth Base64 Command Obfuscation**: Terminal deployment one-liners hide all URLs and API endpoints. Direct browser access is automatically blocked (`404 Not Found`).
+* 📄 **Automated PDF & XML Compliance Reports**: Generates professional, branded PDF inspection reports containing hardware specs, software inventory, hotfixes, antivirus status, and login history.
+* 🔍 **Smart Network Scanner Engine**: Parallel ICMP Ping Sweep (128 threads), TCP Port Scanning (64 threads), and ARP discovery for subnet device identification.
+* 📊 **Software & Hardware Delta Diff Engine**: Automatically compares consecutive scans of the same laptop to highlight newly installed software, removed apps, and hardware modifications.
+* 📡 **WiFi Dashboard & Metrics**: Real-time signal strength analysis and indoor router distance estimation using RSSI log-distance path loss modeling.
+
+---
+
+## 🛠️ Tech Stack
+
+| Layer | Technologies Used | Purpose |
 |---|---|---|
-| **Backend** | Python 3 + FastAPI | REST API server, audit ingestion, network scanning |
-| **Frontend** | Vanilla HTML/CSS/JS | Single-page application dashboard |
-| **Report Generation** | ReportLab | PDF compliance report generation |
-| **Remote Execution** | PyPsExec + PyWinRM | Remote notification delivery to target PCs |
-| **Network Scanning** | Python `socket` + `subprocess` | TCP port scan + ICMP ping sweep + ARP discovery |
-| **Audit Script** | PowerShell (`.ps1`) | Agentless data collection on target Windows machines |
-| **Data Storage** | JSON files + PDF | Audit records stored as structured files per device |
-| **Connectivity** | Windows WLAN API (`netsh`) | Programmatic WiFi network management |
+| **Backend Core** | Python 3.10+ / FastAPI / Uvicorn | High-performance async REST API & ingestion server |
+| **Frontend UI** | HTML5, Vanilla CSS3 (Custom Glassmorphism), Modern ES6 JS | Rich single-page dashboard with zero heavy external dependencies |
+| **Database** | SQLite3 + WAL Mode | Lightweight, real-time relational storage for device audits |
+| **Report Generator** | ReportLab PDF Engine | Automated PDF audit report generation |
+| **Windows Executable Compiler** | Microsoft C# Compiler (`csc.exe`) / PowerShell VBS | Dynamic `.exe` and `.vbs` binary launcher generator |
+| **Unix Engine** | POSIX Shell (`bash`) / Python3 Fallback | Agentless macOS and Linux data collection script |
+| **Network & Security** | `socket`, `subprocess`, Base64, WinHTTP CLI | Subnet scanning, ARP parsing, and obfuscated communication |
 
 ---
 
-## Project Structure
+## 💻 Installation & Execution Guide (Step-by-Step for All 3 OS)
 
-```
-InfraPulse-Compliance-Audit-Portal/
-│
-├── backend/
-│   ├── main.py              # FastAPI application — all API endpoints
-│   └── requirements.txt     # Python dependencies
-│
-├── frontend/
-│   └── index.html           # Single-page dashboard (HTML + CSS + JS)
-│
-├── scripts/
-│   ├── audit.ps1            # PowerShell audit collection script (Windows)
-│   └── audit.sh             # Shell audit script (Linux/Mac — legacy)
-│
-├── user_info/               # Audit output storage (JSON + PDF per audit)
-├── logs/
-│   └── audit_backend.log    # Application & scan logs
-│
-└── venv/                    # Python virtual environment
-```
+### 1. Windows Setup & Execution (`.exe` / `.vbs`)
+
+#### **Method A: 1-Click Binary Executable (`.exe`) — Recommended**
+1. On the target Windows laptop, open the portal and navigate to the **Terminal Command** tab.
+2. Click **`🪟 Windows Binary (.exe Launcher)`** to download `RunAudit_Windows.exe`.
+3. Open your **Downloads** folder and **double-click `RunAudit_Windows.exe`**.
+4. The audit will run **silently in the background** with zero terminal windows popping up. The report will appear on the dashboard within 10 seconds.
+
+#### **Method B: Stealth Terminal Command**
+1. Copy the obfuscated 1-click command from the portal dashboard:
+   ```powershell
+   powershell -c "[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('...')) | iex"
+   ```
+2. Open **PowerShell** on the target laptop, paste the command, and press **Enter**.
 
 ---
 
-## Core Features
+### 2. macOS Setup & Execution (`.command`)
 
-### 1. 🖥️ Device Audit (Compliance Audit Tab)
+#### **Method A: Double-Clickable Finder Launcher (`.command`)**
+1. Open the portal dashboard and click **`🍎 macOS Launcher (.command)`** to download `RunAudit_Mac.command`.
+2. Open Finder $\rightarrow$ **Downloads** folder.
+3. **Double-click** `RunAudit_Mac.command`.  
+   *(Note: If macOS displays a security prompt, Right-Click the file $\rightarrow$ select **Open** $\rightarrow$ click **Open**).*
 
-- **Agentless collection** — no software needs to be installed on target machines.
-- The audit PowerShell script is **dynamically served** from the backend with the correct server IP and a unique session `client_id` pre-injected.
-- On execution, the script silently collects:
-  - **OS Information** — Name, version, architecture, Windows license status.
-  - **Hardware Details** — CPU model, total RAM, disk drives and sizes, GPU name/VRAM/driver version, system manufacturer, model, and serial number.
-  - **Network Configuration** — IP address, MAC address, subnet, gateway, all NIC adapters.
-  - **Security Status** — Antivirus products detected (Windows Defender, third-party AV).
-  - **Hotfixes / Windows Updates** — All installed KB patches with dates.
-  - **Peripheral Devices** — USB devices, keyboards, mice, scanners, printers, Bluetooth.
-  - **Disk Partitions** — All partitions, sizes, types, and boot flags.
-  - **Compression Utilities** — WinZip, 7-Zip, WinRAR detection.
-  - **CD/DVD Drives** — Detection of optical drives.
-  - **Printers** — All connected/networked printers with driver, port, and status.
-  - **User Accounts** — All local accounts with disabled/enabled status.
-  - **Software Inventory** — Full list of 100–200+ installed applications with version, publisher, install date, and size.
-  - **Login History** — Up to 20 most recent interactive logons from the Windows Security Event Log (requires Admin) with logon type and timestamp.
-- The collected data is uploaded to the server as a **JSON payload** and saved.
-- A **PDF Inspection Report** is automatically generated and saved.
+#### **Method B: Terminal Command**
+1. Copy the macOS command from the portal dashboard:
+   ```bash
+   curl -sSL "https://<your-portal-domain>/sys-agent-mac?client_id=mac_01" | bash
+   ```
+2. Open **Terminal** on macOS, paste the line, and press **Enter**.
 
 ---
 
-### 2. 🗂️ Asset Registry Tab
+### 3. Linux Setup & Execution (`.sh`)
 
-- Manually register and track any device with:
-  - Device ID / Hostname
-  - Asset Tag (e.g., `InfraPulse-AST-2024-001`)
-  - Owner / Assignee name, Department, Location / Branch
-  - Purchase date, price, and warranty expiry
-  - Life cycle stage (Active, Maintenance, Retired, Disposed)
-  - Vendor and additional notes
-- All registered assets are displayed in a sortable, filterable table.
-- Supports **Edit** and **Delete** operations.
-- **Export to CSV** for offline reporting.
+#### **Method A: Double-Clickable Shell Launcher (`.sh`)**
+1. Click **`🐧 Linux Launcher (.sh)`** on the dashboard to download `RunAudit_Linux.sh`.
+2. Open terminal in Downloads folder and grant execution permission:
+   ```bash
+   chmod +x RunAudit_Linux.sh
+   ```
+3. Run the script:
+   ```bash
+   ./RunAudit_Linux.sh
+   ```
 
----
-
-### 3. 🔍 Network Discovery Tab
-
-- **Automatic subnet detection** from the current WiFi connection.
-- **Two-phase discovery engine:**
-  1. **ICMP Ping Sweep** — Pings all 254 IPs in parallel (128 threads) to populate the OS ARP cache. Ensures **all** live devices are found, including mobile phones and firewalled PCs that block TCP ports.
-  2. **TCP Port Scan** — Scans 10 common ports in parallel (64 threads) with configurable timeout.
-- **Smart device classification** by open ports and hostname:
-  - `Windows Host` (ports 135 RPC, 445 SMB, 3389 RDP)
-  - `Web Service / Network Device` (ports 80/443)
-  - `Linux / SSH Device` (port 22)
-  - `Printer` (port 9100)
-  - `Mobile / Firewalled Device` (ARP-only, no open ports)
-- **ARP fallback** — Discovers any live device with all TCP ports blocked. Broadcast IPs and `ff:ff:ff:ff:ff:ff` MACs are filtered out.
-- **Audit status enrichment** — Cross-references IPs/hostnames against stored audit files to show `✅ Audited` or `⚠️ Unaudited` badge.
-- **Send Notification button** — Remotely delivers an IT audit notification to any Windows machine using PsExec or WinRM.
-- **Copy Manual Command button** — Generates a PowerShell one-liner for manual execution on a target machine.
-- Filter by IP, hostname, OS, or username. Export results to CSV.
-
----
-
-### 4. 🖥️ Device Audits Tab (Hardware + Software + Logins)
-
-- Dropdown selector populated with all audited devices from `user_info/`.
-- On device selection, displays **three rich panels**:
-
-  **Panel 1 — System Specifications:**
-  - OS name and build version, CPU, RAM, Storage, Manufacturer/Model, Serial Number, Antivirus, License status badge.
-
-  **Panel 2 — Recent Logins:**
-  - Table of last 20 logins: Username, Domain, Logon Type, Timestamp.
-  - Logon types: `Local Interactive`, `Cached Interactive`, `Unlock`, `Remote (RDP)`.
-
-  **Panel 3 — Software Inventory:**
-  - Full table of all installed applications.
-  - Search/filter by name, publisher, or version.
-  - Export to CSV.
-
----
-
-### 5. 📡 WiFi Dashboard Tab
-
-- View **available WiFi networks** with SSID, signal strength, and security type.
-- **Connect** to any network directly from the browser.
-- After connecting, automatically runs a **device scan** on the new subnet.
-- Displays live **Connected Devices** table with audit status.
-
----
-
-### 6. 📄 PDF Report Generation
-
-- Every audit automatically generates a **professional PDF compliance report** containing:
-  - Branch name, code, officer name, date, and audit timestamp.
-  - Compliance summary table (OS, CD drive, printer, antivirus, compression).
-  - Full hardware specification and network adapter table.
-  - Complete hotfix / Windows Update list.
-  - Full software inventory table.
-- Reports stored as `audit_<id>_<PC name>_<timestamp>.pdf` in `user_info/`.
-
----
-
-## System Architecture
-
-```mermaid
-graph TB
-    subgraph "IT Officer Machine - Server"
-        A["FastAPI Backend main.py"]
-        B["user_info/ JSON + PDF Storage"]
-        C["scripts/audit.ps1 Dynamically Served"]
-        D["frontend/index.html Single-Page App"]
-    end
-
-    subgraph "Target Windows Machine"
-        E["PowerShell Runs Audit Script"]
-        F["Windows Security Event Log 4624"]
-        G["Windows Registry Installed Software"]
-        H["WMI / CIM Hardware Info"]
-    end
-
-    subgraph "Network"
-        I["WiFi Router / AP"]
-        J["Mobile Devices ARP Only"]
-        K["Printers Port 9100"]
-    end
-
-    A -- "Serves Dashboard" --> D
-    A -- "Serves Script with injected client_id" --> C
-    D -- "REST API calls" --> A
-    E -- "Downloads script" --> C
-    E -- "Reads" --> F
-    E -- "Reads" --> G
-    E -- "Queries" --> H
-    E -- "POST /upload-audit JSON payload" --> A
-    A -- "Saves" --> B
-    A -- "ICMP Ping Sweep + TCP Port Scan" --> I
-    I --- J
-    I --- K
-    A -- "PsExec / WinRM Remote Notification" --> E
-```
-
----
-
-## Audit Workflow
-
-```mermaid
-sequenceDiagram
-    participant Officer as IT Officer Browser
-    participant Server as FastAPI Server
-    participant Target as Target Windows PC
-    participant Storage as user_info folder
-
-    Officer->>Server: Click Copy Manual Command or Send Notification
-    Server->>Server: Generate unique client_id
-    Server-->>Officer: PowerShell one-liner with client_id and server IP
-    Officer->>Target: Paste and Run command as Admin
-    Target->>Server: GET /api/get-audit-script?client_id=xxx
-    Server-->>Target: audit.ps1 with client_id + server URL injected
-    Target->>Target: Collect GPU, CPU, RAM, Disk, OS info
-    Target->>Target: Collect Network adapters and peripherals
-    Target->>Target: Scan 131+ installed applications
-    Target->>Target: Read Security Event Log login history
-    Target->>Server: POST /upload-audit large JSON payload
-    Server->>Storage: Save audit_xxx_PCNAME_timestamp.json
-    Server->>Storage: Generate and Save PDF report
-    Server-->>Target: status ok
-    Officer->>Server: Open Device Audits tab
-    Server-->>Officer: System specs + login history + software list
-```
-
----
-
-## Network Discovery Workflow
-
-```mermaid
-flowchart TD
-    A["Start Scan subnet 10.x.x.0/24"] --> B["Step 1 ICMP Ping Sweep\n128 parallel threads\nPings all 254 IPs"]
-    B --> C["ARP Cache Populated\nAll live devices registered\nin OS network table"]
-    C --> D["Step 2 TCP Port Scan\n64 parallel threads\n10 ports per IP"]
-    D --> E{"Open ports found?"}
-    E -- "Yes" --> F["Classify Device by open ports\nWindows / Linux / Printer / Web"]
-    E -- "No" --> G["Step 3 ARP Fallback\nRead ARP table for MAC-only devices"]
-    G --> H{"In subnet? Not broadcast?"}
-    H -- "Yes" --> I["Classify as Mobile or Firewalled Device"]
-    H -- "No" --> J["Skip - broadcast or invalid"]
-    F --> K["Enrich with Audit Data\ncross-ref user_info files"]
-    I --> K
-    K --> L["Display in Connected Devices Table\nAudited or Unaudited badge"]
-```
-
----
-
-## WiFi Management Workflow
-
-```mermaid
-flowchart LR
-    A["Officer Opens WiFi Tab"] --> B["GET /wifi/networks\nList available SSIDs"]
-    B --> C["Select Network + Enter Password"]
-    C --> D["POST /wifi/connect\nnetsh wlan add profile\nnetsh wlan connect"]
-    D --> E["Poll for IP Assignment\nup to 12 seconds"]
-    E --> F["GET /wifi/current\nDetect IP + Subnet"]
-    F --> G["Auto-start Device Scan\non new subnet"]
-    G --> H["Display Connected Devices Table"]
-```
-
----
-
-## Data Flow Diagram
-
-```mermaid
-graph LR
-    subgraph "Data Collection"
-        A["PowerShell Script audit.ps1"] --> B["JSON Payload 40-80 KB"]
-    end
-
-    subgraph "Backend Processing"
-        B --> C["POST /upload-audit"]
-        C --> D["Pydantic Validation AuditData model"]
-        D --> E["Save JSON user_info/audit_*.json"]
-        D --> F["Generate PDF ReportLab"]
-    end
-
-    subgraph "Frontend Display"
-        G["GET /api/devices"] --> H["Device Dropdown"]
-        H --> I["GET /api/software/name"]
-        I --> J["System Specs Panel"]
-        I --> K["Recent Logins Table"]
-        I --> L["Software Inventory Table"]
-    end
-
-    E --> G
-    F --> M["PDF Stored user_info/audit_*.pdf"]
-```
-
----
-
-## API Reference
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/wifi/networks` | List all available WiFi networks |
-| `GET` | `/wifi/current` | Get current WiFi connection details |
-| `POST` | `/wifi/connect` | Connect to a WiFi network |
-| `GET` | `/wifi/scan-devices` | Scan current subnet for live devices |
-| `POST` | `/discover/network-scan` | Run custom subnet port scan |
-| `POST` | `/upload-audit` | Receive and store a full audit payload |
-| `GET` | `/api/get-audit-script` | Serve dynamic audit.ps1 with injected client_id |
-| `GET` | `/api/devices` | List all audited devices |
-| `GET` | `/api/software/{computer_name}` | Get full audit data for a device |
-| `POST` | `/audit/send-notification` | Remote-execute audit notification on target PC |
-| `GET` | `/assets` | List all registered assets |
-| `POST` | `/assets` | Create or update an asset registration |
-| `DELETE` | `/assets/{device_id}` | Remove an asset |
-| `GET` | `/scripts/audit.ps1` | Serve raw audit script file |
-| `GET` | `/` | Serve the frontend dashboard |
-
----
-
-## Setup & Running
-
-### Prerequisites
-
-- Python 3.10+
-- Windows OS (required for WiFi and network scanning features)
-- PowerShell 5.1+ on target audit machines
-
-### Installation
-
+#### **Method B: 1-Line Bash Execution**
 ```bash
-# 1. Clone the repository
-git clone https://github.com/Rudra-Gupta15/Prevoyance_inspection.git
-cd Prevoyance_inspection
-
-# 2. Create and activate virtual environment
-python -m venv venv
-venv\Scripts\activate
-
-# 3. Install Python dependencies
-pip install -r backend/requirements.txt
-
-# 4. Start the server
-uvicorn backend.main:app --host 0.0.0.0 --reload
-```
-
-### Accessing the Portal
-
-- **Local machine:** `http://localhost:8000`
-- **From any device on the same network:** `http://<your-server-ip>:8000`
-
-### Running an Audit on a Target Machine
-
-```powershell
-# Run as Administrator on the target PC
-powershell -c "Invoke-WebRequest -Uri 'http://<SERVER_IP>:8000/api/get-audit-script?client_id=manual_audit' -OutFile '$env:TEMP\audit.ps1'; & '$env:TEMP\audit.ps1'"
-```
-
-> **Tip:** Use the **Copy Manual Command** button in the WiFi Dashboard tab to auto-generate this command with the correct server IP pre-filled.
-
----
-
-## Security & Permissions
-
-| Feature | Requirement |
-|---|---|
-| Run audit script | Any standard user |
-| Read full login history | **Administrator** on target machine |
-| Send remote notification via PsExec | Admin credentials + SMB/File Sharing enabled |
-| Send remote notification via WinRM | WinRM enabled on target |
-| WiFi connect/disconnect | Sufficient Windows privileges on server |
-| Read Security Event Log | Administrator on target machine |
-
-### Enabling Remote Audit via PsExec
-
-Run on the **target machine** as Administrator:
-
-```powershell
-# Allow remote administration for local accounts
-New-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" `
-    -Name "LocalAccountTokenFilterPolicy" -Value 1 -PropertyType DWord -Force
-
-# Enable File and Printer Sharing
-netsh advfirewall firewall set rule group="File and Printer Sharing" new enable=Yes
+curl -sSL "https://<your-portal-domain>/sys-agent-mac?client_id=linux_01" | bash
 ```
 
 ---
 
-## Output Files
+## 📖 User Guide (How to Use the Portal)
 
-Every completed audit produces two files in `user_info/`:
-
-| File | Format | Contents |
-|---|---|---|
-| `audit_<id>_<PC>_<timestamp>.json` | JSON | Full raw audit data — hardware, software, logins, network |
-| `audit_<id>_<PC>_<timestamp>.pdf` | PDF | Formatted compliance inspection report for submission |
+1. **Launch the Central Portal Server**:
+   ```bash
+   uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+   ```
+2. **Access Dashboard**: Open `http://localhost:8000` (or your assigned Cloudflare Tunnel URL) in any web browser.
+3. **Perform Audits**:
+   - Navigate to the **Terminal Command** tab.
+   - Select your deployment mode (Local Wi-Fi or Remote Internet).
+   - Download the appropriate OS launcher (`.exe`, `.command`, or `.sh`) or copy the obfuscated command.
+   - Run the launcher on the target workstation.
+4. **View Compliance Inspection Reports**:
+   - Go to **Device Audits** or **All Devices** on the left sidebar.
+   - Select the audited laptop from the dropdown menu to inspect system hardware specs, motherboard details, installed software list, recent logins, and GPU details.
+   - Click **Download PDF Report** to save or print the official compliance document.
 
 ---
 
-*Built for InfraPulse e-Governance Infrastructure Ltd. — IT Compliance & Branch Audit Operations.*
+## 📝 Testing Note
+
+> [!NOTE]
+> **Cloudflare Tunnel Access Provided by Prevoyance IT Solutions**  
+> Whenever you test the portal or audit laptops across different Wi-Fi networks / remote home locations, **Prevoyance IT Solutions** will provide a live, pre-configured **Cloudflare Tunnel URL** (e.g., `https://xxxx.trycloudflare.com`).  
+> 
+> Simply enter this provided Cloudflare link into Section 3 of your dashboard, and all generated commands & double-clickable launchers will work over HTTPS across any laptop worldwide without requiring router port forwarding or manual IP setup.
+
+---
+
+*© Prevoyance IT Solutions. All rights reserved.*
