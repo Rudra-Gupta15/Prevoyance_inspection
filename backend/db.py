@@ -285,6 +285,9 @@ def _to_pg(sql: str) -> str:
         sql = sql.rstrip().rstrip(";").replace(" RETURNING id", "")
         sql += " ON CONFLICT DO NOTHING"
 
+    # 7. Remove SQLite-specific COLLATE NOCASE
+    sql = re.sub(r"\s+COLLATE\s+NOCASE", "", sql, flags=re.IGNORECASE)
+
     return sql
 
 

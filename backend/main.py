@@ -1443,7 +1443,7 @@ def get_software_for_device(device_id: str):
         conn.row_factory = sqlite3.Row
         cursor = conn.execute('''
             SELECT audit_data, execution_datetime FROM device_audits 
-            WHERE mac_address = ? COLLATE NOCASE OR computer_name = ? COLLATE NOCASE
+            WHERE LOWER(mac_address) = LOWER(?) OR LOWER(computer_name) = LOWER(?)
             ORDER BY id DESC, execution_datetime DESC LIMIT 1
         ''', (device_id, device_id))
         row = cursor.fetchone()
@@ -1495,7 +1495,7 @@ def get_device_diff(device_id: str):
         conn.row_factory = sqlite3.Row
         cursor = conn.execute('''
             SELECT audit_data, execution_datetime FROM device_audits 
-            WHERE mac_address = ? COLLATE NOCASE OR computer_name = ? COLLATE NOCASE
+            WHERE LOWER(mac_address) = LOWER(?) OR LOWER(computer_name) = LOWER(?)
             ORDER BY execution_datetime DESC LIMIT 2
         ''', (device_id, device_id))
         for row in cursor:
