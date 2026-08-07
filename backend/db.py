@@ -14,11 +14,18 @@ from contextlib import contextmanager
 logger = logging.getLogger("AuditBackend.DB")
 
 # ── Load .env if available ────────────────────────────────────────────────────
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-except ImportError:
-    pass
+def _load_env():
+    try:
+        from dotenv import load_dotenv
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        root_dir = os.path.abspath(os.path.join(base_dir, ".."))
+        load_dotenv(os.path.join(root_dir, ".env"), override=True)
+        load_dotenv(os.path.join(base_dir, ".env"), override=True)
+        load_dotenv(override=True)
+    except ImportError:
+        pass
+
+_load_env()
 
 PG_HOST     = os.getenv("PG_HOST", "")
 PG_PORT     = int(os.getenv("PG_PORT", "5432"))

@@ -20,9 +20,9 @@ import os
 import json
 import sqlite3
 try:
-    from backend.db import get_db, init_db, USE_POSTGRES, get_active_engine, write_db_config, _psycopg2_available, PG_HOST, PG_DATABASE
+    from backend.db import get_db, init_db, USE_POSTGRES, get_active_engine, write_db_config, _psycopg2_available, PG_HOST, PG_DATABASE, _load_env
 except ImportError:
-    from db import get_db, init_db, USE_POSTGRES, get_active_engine, write_db_config, _psycopg2_available, PG_HOST, PG_DATABASE
+    from db import get_db, init_db, USE_POSTGRES, get_active_engine, write_db_config, _psycopg2_available, PG_HOST, PG_DATABASE, _load_env
 import os as os_module
 import xml.etree.ElementTree as ET
 from datetime import datetime
@@ -2844,11 +2844,7 @@ def set_audit_engine(data: AuditEngineRequest):
 def get_db_engine():
     """Get current database engine and available options. Reloads .env on every call."""
     import os as _os
-    try:
-        from dotenv import load_dotenv
-        load_dotenv(override=True)  # always re-read .env — picks up changes without restart
-    except ImportError:
-        pass
+    _load_env()
     pg_host     = _os.getenv("PG_HOST", "")
     pg_database = _os.getenv("PG_DATABASE", "")
     active      = get_active_engine()
@@ -2870,11 +2866,7 @@ class DbEngineRequest(BaseModel):
 def set_db_engine(data: DbEngineRequest):
     """Switch database engine at runtime (saved to db_config.json). Reloads .env first."""
     import os as _os
-    try:
-        from dotenv import load_dotenv
-        load_dotenv(override=True)
-    except ImportError:
-        pass
+    _load_env()
     pg_host     = _os.getenv("PG_HOST", "")
     pg_database = _os.getenv("PG_DATABASE", "")
     mode = data.engine.lower().strip()
