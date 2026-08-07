@@ -1,6 +1,6 @@
 # InfraPulse — Automated IT Compliance & Asset Inspection Portal
 
-> **Developed by Prevoyance IT Solutions**  
+> **Engineered by Prevoyance IT Solutions**  
 > *A full-stack, enterprise-grade IT compliance auditing and asset management platform. Discovers, inspects, and generates structured compliance reports for Windows, macOS, and Linux workstations across local networks and remote internet locations with zero manual configuration.*
 
 ---
@@ -12,17 +12,17 @@
 3. [Problem Statement](#problem-statement)
 4. [Key Features](#key-features)
 5. [Tech Stack](#tech-stack)
-6. [Installation & Execution Guide (Step-by-Step for All 3 OS)](#installation--execution-guide-step-by-step-for-all-3-os)
-   - [Windows Setup & Execution (.exe / .vbs)](#1-windows-setup--execution-exe--vbs)
-   - [macOS Setup & Execution (.command)](#2-macos-setup--execution-command)
-   - [Linux Setup & Execution (.sh)](#3-linux-setup--execution-sh)
-7. [Portal Workflow Guide](#portal-workflow-guide)
+6. [Portal Workflow Guide](#portal-workflow-guide)
    - [1. Info Gathering (Network Scanner)](#1-info-gathering-network-scanner)
    - [2. Device Audits](#2-device-audits)
    - [3. WiFi Dashboard](#3-wifi-dashboard)
    - [4. All Devices](#4-all-devices)
    - [5. Terminal Command](#5-terminal-command)
    - [6. Settings](#6-settings)
+7. [Installation & Execution Guide (Step-by-Step for All 3 OS)](#installation--execution-guide-step-by-step-for-all-3-os)
+   - [Windows Setup & Execution (.exe / .vbs)](#1-windows-setup--execution-exe--vbs)
+   - [macOS Setup & Execution (.command)](#2-macos-setup--execution-command)
+   - [Linux Setup & Execution (.sh)](#3-linux-setup--execution-sh)
 8. [Important Testing Note](#important-testing-note)
 
 ---
@@ -30,7 +30,7 @@
 ## Project Name
 
 **InfraPulse: Enterprise IT Compliance Audit & Asset Inspection System**  
-*Product by:* **Prevoyance IT Solutions**
+*Engineered by:* **Prevoyance IT Solutions**
 
 ---
 
@@ -81,45 +81,6 @@ Traditional IT compliance audits at branch offices and corporate workstations fa
 | **Network & Security** | `socket`, `subprocess`, Base64, WinHTTP CLI | Subnet scanning, ARP parsing, and obfuscated communication |
 
 ---
-
-## Installation & Execution Guide (Step-by-Step for All 3 OS)
-
-### 1. Windows Setup & Execution (.exe / .vbs)
-
-1. On the target Windows laptop, open the portal and navigate to the **Terminal Command** tab.
-2. Click **Windows Binary (.exe Launcher)** to download `RunAudit_Windows.exe` (or click **Windows VBS (.vbs)** to download `RunAudit_Windows.vbs`).
-3. Open the **Downloads** folder and **double-click `RunAudit_Windows.exe`**.
-4. The audit will run silently in the background with zero terminal windows popping up. The report will appear on the dashboard within 10 seconds.
-
----
-
-### 2. macOS Setup & Execution (.command)
-
-1. Open the portal dashboard and navigate to the **Terminal Command** tab.
-2. Click **macOS Launcher (.command)** to download `RunAudit_Mac.command`.
-3. Open Finder and go to the **Downloads** folder.
-4. **Double-click** `RunAudit_Mac.command`.  
-   *(Note: If macOS displays a security prompt, right-click the file, select **Open**, and click **Open**).*
-5. The script executes the audit scan and submits the report automatically.
-
----
-
-### 3. Linux Setup & Execution (.sh)
-
-1. Open the portal dashboard and navigate to the **Terminal Command** tab.
-2. Click **Linux Launcher (.sh)** to download `RunAudit_Linux.sh`.
-3. Open the terminal in your Downloads folder and grant execution permission:
-   ```bash
-   chmod +x RunAudit_Linux.sh
-   ```
-4. Execute the launcher:
-   ```bash
-   ./RunAudit_Linux.sh
-   ```
-5. The audit data is collected and uploaded directly to your compliance portal.
-
----
-
 ## Portal Workflow Guide
 
 ### 1. Info Gathering (Network Scanner)
@@ -161,17 +122,65 @@ The **All Devices** tab serves as the central inventory registry for the organiz
 ### 5. Terminal Command
 The **Terminal Command** tab handles deployment configuration and executable launcher downloads.
 * **Deployment Mode Configuration**: Set custom server IP addresses and ports for local network or remote cloud deployment.
-* **🔒 Obfuscation Toggle**: Enables Base64 encoding for one-line terminal execution commands to hide backend URLs.
+* **Obfuscation Toggle**: Enables Base64 encoding for one-line terminal execution commands to hide backend URLs.
 * **Double-Clickable Launchers**: Provides direct 1-click download links for compiled binary launchers (`.exe` for Windows, `.command` for macOS, `.sh` for Linux).
 
 ---
 
 ### 6. Settings
-The **Settings** tab manages portal configuration and administrative tools.
+The **Settings** tab manages portal configuration, network endpoints, and audit engine selection.
+* **Audit Telemetry Engine Provider**: Switch seamlessly between **Native OS Diagnostics** (PowerShell / Bash) and the **osquery SQL Engine**.
+* **osquery Interactive SQL Console**: Run ad-hoc SQL queries (e.g. `SELECT * FROM programs`, `SELECT * FROM users`, `SELECT * FROM mounts`) live across connected workstation nodes.
+* **Server & Network Configuration**: Customize server IP, listening port, upload protocol (HTTP/HTTPS), and dashboard auto-refresh rate.
 * **Portal Preferences**: Configure default audit parameters, report branding, and storage options.
 * **Asset Metadata Management**: Edit or assign custom asset tags, owner details, department locations, and lifecycle stages (Active, Maintenance, Retired).
 
 ---
+
+## Installation & Execution Guide (Step-by-Step for All 3 OS)
+
+### 1. Windows Setup & Execution (.exe / .vbs)
+
+1. On the target Windows laptop, open the portal and navigate to the **Terminal Command** tab.
+2. Click **Windows Binary (.exe Launcher)** to download `RunAudit_Windows.exe` (or click **Windows VBS (.vbs)** to download `RunAudit_Windows.vbs`).
+3. Open the **Downloads** folder and **double-click `RunAudit_Windows.exe`**.
+4. The audit will run silently in the background with zero terminal windows popping up. The report will appear on the dashboard within 10 seconds.
+
+---
+
+### 2. macOS Setup & Execution (.command)
+
+1. Open the portal dashboard and navigate to the **Terminal Command** tab.
+2. Click **macOS Launcher (.command)** to download `RunAudit_Mac.command`.
+3. Open Terminal in your Downloads folder and grant execution permission:
+   ```bash
+   chmod +x RunAudit_Mac.command
+   ```
+4. Execute the launcher:
+   ```bash
+   ./RunAudit_Mac.command
+   ```
+5. *(Optional Finder Execution)*: Alternatively, you can double-click `RunAudit_Mac.command` directly in Finder. If macOS displays a security prompt, right-click the file, select **Open**, and click **Open**.
+6. The script executes the audit scan and submits the report automatically.
+
+---
+
+### 3. Linux Setup & Execution (.sh)
+
+1. Open the portal dashboard and navigate to the **Terminal Command** tab.
+2. Click **Linux Launcher (.sh)** to download `RunAudit_Linux.sh`.
+3. Open the terminal in your Downloads folder and grant execution permission:
+   ```bash
+   chmod +x RunAudit_Linux.sh
+   ```
+4. Execute the launcher:
+   ```bash
+   ./RunAudit_Linux.sh
+   ```
+5. The audit data is collected and uploaded directly to your compliance portal.
+
+---
+
 
 ## Important Testing Note
 
@@ -181,4 +190,7 @@ The **Settings** tab manages portal configuration and administrative tools.
 
 ---
 
-*Copyright Prevoyance IT Solutions. All rights reserved.*
+### Thank You for Choosing Prevoyance IT Solutions
+
+> **Delivering Smart, Automated & Secure IT Infrastructure Solutions.**  
+> *For technical assistance, custom deployment inquiries, or security compliance support, please reach out to the **Prevoyance IT Solutions** technical team.*
