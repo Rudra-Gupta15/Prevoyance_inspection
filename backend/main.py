@@ -374,10 +374,26 @@ class NetworkScanRequest(BaseModel):
 # ==============================================================================
 # 3. CORE ROUTING & SCRIPT LAUNCHERS
 # ==============================================================================
+@app.get("/", response_class=FileResponse)
+@app.get("/index.html", response_class=FileResponse)
+def serve_frontend():
+    """Serve frontend index.html dashboard directly from FastAPI backend."""
+    possible_paths = [
+        "frontend/index.html",
+        "../frontend/index.html",
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "frontend", "index.html"),
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "frontend", "index.html"),
+    ]
+    for path in possible_paths:
+        if os.path.exists(path):
+            return FileResponse(path)
+    raise HTTPException(status_code=404, detail="frontend/index.html not found.")
+
 @app.get("/check-status")
 def check_status(client_id: str = Query(...)):
     session = sessions.get(client_id, {"status": "pending"})
     return JSONResponse(content=session)
+
 
 
 def get_effective_base_url(request: Request) -> str:
