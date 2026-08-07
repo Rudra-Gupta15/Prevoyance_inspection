@@ -2905,6 +2905,38 @@
                                     </div>
                                 </div>
 
+                                <!-- DATABASE ENGINE TOGGLE CARD -->
+                                <div class="card" style="grid-column: span 2; border-top: 4px solid #059669; margin-top:0;">
+                                    <div class="card-header" style="margin-bottom:16px;">
+                                        <div>
+                                            <div class="card-title" style="display:flex; align-items:center; gap:8px;">
+                                                <span>🗄️ Database Storage Engine</span>
+                                                <span id="dbEngineBadge" class="badge" style="background:#d1fae5; color:#065f46; font-size:11px; font-weight:600; padding:3px 8px; border-radius:12px;">Checking...</span>
+                                            </div>
+                                            <div class="card-subtitle">Choose between local SQLite (offline) and cloud PostgreSQL (deployment). On AWS, this is locked to PostgreSQL via environment variable.</div>
+                                        </div>
+                                    </div>
+                                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
+                                        <div id="dbCardSqlite" onclick="selectDbEngine('sqlite')" style="padding:18px; border:2px solid var(--border); border-radius:12px; cursor:pointer; background:var(--surface-2); transition:all 0.2s;">
+                                            <div style="font-size:16px; font-weight:700; color:#92400e; margin-bottom:6px; display:flex; align-items:center; gap:8px;">
+                                                <span>📁 SQLite (Local)</span>
+                                                <span id="radioDbSqlite" style="margin-left:auto; font-size:13px; color:var(--muted); display:none;">⚪ Select</span>
+                                            </div>
+                                            <div style="font-size:13px; color:var(--muted); line-height:1.5;">Zero-config local database file (<code>audits.db</code>). Best for local / Cloudflare tunnel deployments. Data stays on this machine.</div>
+                                        </div>
+                                        <div id="dbCardPostgres" onclick="selectDbEngine('postgres')" style="padding:18px; border:2px solid var(--border); border-radius:12px; cursor:pointer; background:var(--surface-2); transition:all 0.2s;">
+                                            <div style="font-size:16px; font-weight:700; color:#065f46; margin-bottom:6px; display:flex; align-items:center; gap:8px;">
+                                                <span>🐘 PostgreSQL (Cloud)</span>
+                                                <span id="radioDbPostgres" style="margin-left:auto; font-size:13px; color:var(--muted); display:none;">⚪ Select</span>
+                                            </div>
+                                            <div id="pgDbInfo" style="font-size:13px; color:var(--muted); line-height:1.5;">Cloud PostgreSQL database. Required for AWS / multi-server deployments. Requires <code>.env</code> credentials.</div>
+                                        </div>
+                                    </div>
+                                    <div id="dbEnvOverrideNotice" style="display:none; margin-top:12px; background:#fef3c7; border:1px solid #fcd34d; border-radius:8px; padding:10px 14px; font-size:12.5px; color:#92400e; font-weight:600;">
+                                        🔒 <strong>DB_ENGINE env var is set</strong> — the engine is locked by the server environment (AWS deployment mode). UI switching is disabled.
+                                    </div>
+                                </div>
+
                                 <!-- CLOUDFLARE REMOTE OSQUERY AUDIT DEPLOYMENT CARD -->
                                 <div class="card" style="grid-column: span 2; border-top: 4px solid #0284c7; margin-top:16px;">
                                     <div class="card-header" style="margin-bottom:12px;">
@@ -5632,6 +5664,116 @@
                                 }
                             }
 
+                            // ────────────────────────────────────────────────────────────────────
+                            //  DATABASE STORAGE ENGINE TOGGLE
+                            // ────────────────────────────────────────────────────────────────────
+                            let currentDbEngine = 'sqlite';
+
+                            async function checkDbEngineStatus() {
+                                try {
+                                    const res = await fetch('/api/settings/database');
+                                    const data = await res.json();
+                                    currentDbEngine = data.active_engine || 'sqlite';
+                                    updateDbEngineUi(data);
+                                } catch (err) {
+                                    console.error('Failed to check DB engine status:', err);
+                                }
+                            }
+
+                            function updateDbEngineUi(data) {
+                                const active = data.active_engine || 'sqlite';
+                                const locked = data.env_override;
+                                const pgConfigured = data.pg_configured;
+
+                                // Badge
+                                const badge = document.getElementById('dbEngineBadge');
+                                if (badge) {
+                                    if (active === 'postgres') {
+                                        badge.style.background = '#d1fae5';
+                                        badge.style.color = '#065f46';
+                                        badge.textContent = `PostgreSQL — ${data.pg_database || ''}@${data.pg_host || ''}`;
+                                    } else {
+                                        badge.style.background = '#fef3c7';
+                                        badge.style.color = '#92400e';
+                                        badge.textContent = 'SQLite — Local File (audits.db)';
+                                    }
+                                }
+
+                                // Env override notice
+                                const notice = document.getElementById('dbEnvOverrideNotice');
+                                if (notice) notice.style.display = locked ? 'block' : 'none';
+
+                                // PostgreSQL info
+                                const pgInfo = document.getElementById('pgDbInfo');
+                                if (pgInfo && pgConfigured) {
+                                    pgInfo.innerHTML = `Connected to <b>${data.pg_database}</b> on <b>${data.pg_host}</b>. Shared across all server instances.`;
+                                }
+
+                                // Card highlight — SQLite
+                                const cardSqlite = document.getElementById('dbCardSqlite');
+                                const radioSqlite = document.getElementById('radioDbSqlite');
+                                if (cardSqlite && radioSqlite) {
+                                    if (active === 'sqlite') {
+                                        cardSqlite.style.border = '2px solid #d97706';
+                                        cardSqlite.style.background = 'rgba(217,119,6,0.07)';
+                                        radioSqlite.style.display = 'inline';
+                                        radioSqlite.style.color = '#d97706';
+                                        radioSqlite.textContent = '🟠 Active';
+                                    } else {
+                                        cardSqlite.style.border = '2px solid var(--border)';
+                                        cardSqlite.style.background = 'var(--surface-2)';
+                                        radioSqlite.style.display = locked ? 'none' : 'inline';
+                                        radioSqlite.style.color = 'var(--muted)';
+                                        radioSqlite.textContent = '⚪ Select';
+                                    }
+                                }
+
+                                // Card highlight — PostgreSQL
+                                const cardPg = document.getElementById('dbCardPostgres');
+                                const radioPg = document.getElementById('radioDbPostgres');
+                                if (cardPg && radioPg) {
+                                    if (active === 'postgres') {
+                                        cardPg.style.border = '2px solid #059669';
+                                        cardPg.style.background = 'rgba(5,150,105,0.07)';
+                                        radioPg.style.display = 'inline';
+                                        radioPg.style.color = '#059669';
+                                        radioPg.textContent = '🟢 Active';
+                                    } else {
+                                        cardPg.style.border = `2px solid ${pgConfigured ? 'var(--border)' : '#fca5a5'}`;
+                                        cardPg.style.background = 'var(--surface-2)';
+                                        radioPg.style.display = locked ? 'none' : 'inline';
+                                        radioPg.style.color = 'var(--muted)';
+                                        radioPg.textContent = pgConfigured ? '⚪ Select' : '⚠️ Not Configured';
+                                    }
+                                }
+
+                                // Disable clicks if locked by env
+                                if (locked) {
+                                    if (cardSqlite) cardSqlite.style.cursor = 'not-allowed';
+                                    if (cardPg) cardPg.style.cursor = 'not-allowed';
+                                }
+                            }
+
+                            async function selectDbEngine(engine) {
+                                try {
+                                    const res = await fetch('/api/settings/database', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ engine })
+                                    });
+                                    const data = await res.json();
+                                    if (res.ok) {
+                                        currentDbEngine = engine;
+                                        showAlert('Database Engine Updated', `Now using ${engine === 'postgres' ? '🐘 PostgreSQL' : '📁 SQLite'}. All new read/write operations will use this engine.`, 'success');
+                                        await checkDbEngineStatus();
+                                    } else {
+                                        showAlert('Switch Failed', data.detail || 'Could not switch database engine.', 'error');
+                                    }
+                                } catch (err) {
+                                    showAlert('Network Error', err.message, 'error');
+                                }
+                            }
+
                             function setOsqueryTemplate(sql) {
                                 const input = document.getElementById('osquerySqlInput');
                                 if (input) input.value = sql;
@@ -6726,6 +6868,7 @@
                                 loadPortalSettings();
                                 initTerminalCommands();
                                 checkOsqueryStatus();
+                                checkDbEngineStatus();
                             });
                         </script>
             </main>

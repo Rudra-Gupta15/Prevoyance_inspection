@@ -19,6 +19,10 @@ from xml.sax.saxutils import escape
 import os
 import json
 import sqlite3
+try:
+    from backend.db import get_db, init_db, USE_POSTGRES, get_active_engine, write_db_config, _psycopg2_available, PG_HOST, PG_DATABASE
+except ImportError:
+    from db import get_db, init_db, USE_POSTGRES, get_active_engine, write_db_config, _psycopg2_available, PG_HOST, PG_DATABASE
 import os as os_module
 import xml.etree.ElementTree as ET
 from datetime import datetime
@@ -52,70 +56,9 @@ except ImportError:
     except ImportError:
         from . import osquery_engine
 
-DB_PATH = "audits.db"
+DB_PATH = "audits.db"  # used only for SQLite fallback path
 
-def init_db():
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.execute('''
-            CREATE TABLE IF NOT EXISTS device_audits (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                mac_address TEXT,
-                computer_name TEXT,
-                os_name TEXT,
-                execution_datetime TEXT,
-                audit_data TEXT
-            )
-        ''')
-        conn.execute('''
-            CREATE TABLE IF NOT EXISTS wifi_credentials (
-                ssid TEXT PRIMARY KEY,
-                password TEXT NOT NULL,
-                updated_at TEXT
-            )
-        ''')
-        conn.execute('''
-            CREATE TABLE IF NOT EXISTS asset_lifecycle (
-                mac_address TEXT PRIMARY KEY,
-                computer_name TEXT,
-                owner TEXT DEFAULT '',
-                vendor TEXT DEFAULT '',
-                status TEXT DEFAULT 'Active',
-                warranty_start TEXT DEFAULT '',
-                warranty_end TEXT DEFAULT '',
-                warranty_notes TEXT DEFAULT '',
-                warranty_provider TEXT DEFAULT '',
-                purchase_price TEXT DEFAULT '',
-                purchase_date TEXT DEFAULT '',
-                supplier TEXT DEFAULT '',
-                po_number TEXT DEFAULT '',
-                updated_at TEXT
-            )
-        ''')
-        conn.execute('''
-            CREATE TABLE IF NOT EXISTS asset_tickets (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                mac_address TEXT,
-                computer_name TEXT,
-                ticket_number TEXT,
-                summary TEXT,
-                status TEXT DEFAULT 'Open',
-                assigned TEXT DEFAULT '',
-                priority TEXT DEFAULT 'Medium',
-                mtbf TEXT DEFAULT '',
-                created_at TEXT,
-                updated_at TEXT
-            )
-        ''')
-        conn.execute('''
-            CREATE TABLE IF NOT EXISTS portal_settings (
-                key TEXT PRIMARY KEY,
-                value TEXT NOT NULL
-            )
-        ''')
-        conn.execute("INSERT OR IGNORE INTO portal_settings (key, value) VALUES ('audit_engine', 'native')")
-        conn.commit()
-
-init_db()
+init_db(DB_PATH)
 
 LOGS_DIR          = "logs"
 USER_INFO_DIR     = "user_info"
@@ -791,7 +734,7 @@ def upload_audit(data: AuditData, client_id: str = Query(None)):
     name = data.computer_name
     os_name = data.os_name
     
-    with sqlite3.connect(DB_PATH) as conn:
+    with get_db(DB_PATH) as conn:
         conn.execute('''
             INSERT INTO device_audits (mac_address, computer_name, os_name, execution_datetime, audit_data)
             VALUES (?, ?, ?, ?, ?)
@@ -1233,7 +1176,7 @@ def generate_pdf_for_device(client_id: str) -> str:
     """Dynamically build a ReportLab PDF report from SQLite database audit records."""
     raw_audit = None
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_db(DB_PATH) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.execute('''
                 SELECT audit_data FROM device_audits 
@@ -1423,7 +1366,7 @@ def list_assets():
 @app.get("/api/devices")
 def list_audited_devices():
     devices = {}
-    with sqlite3.connect(DB_PATH) as conn:
+    with get_db(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         cursor = conn.execute('''
             SELECT mac_address, computer_name, os_name, execution_datetime, audit_data
@@ -1496,7 +1439,7 @@ def list_audited_devices():
 @app.get("/api/software/{device_id}")
 def get_software_for_device(device_id: str):
     latest_data = None
-    with sqlite3.connect(DB_PATH) as conn:
+    with get_db(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         cursor = conn.execute('''
             SELECT audit_data, execution_datetime FROM device_audits 
@@ -1548,7 +1491,7 @@ def get_device_diff(device_id: str):
     Returns: newly installed apps, removed apps, hardware changes.
     """
     scans = []
-    with sqlite3.connect(DB_PATH) as conn:
+    with get_db(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         cursor = conn.execute('''
             SELECT audit_data, execution_datetime FROM device_audits 
@@ -1681,7 +1624,7 @@ def get_audit_indexes():
     audit_index: dict = {}
     audit_mac_index: dict = {}
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_db(DB_PATH) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.execute("SELECT mac_address, computer_name, os_name, execution_datetime, audit_data FROM device_audits ORDER BY id DESC")
             for row in cursor:
@@ -2186,7 +2129,7 @@ def get_wifi_networks():
 
     # Query DB saved wifi credentials
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_db(DB_PATH) as conn:
             rows = conn.execute("SELECT ssid FROM wifi_credentials").fetchall()
             for r in rows:
                 if r[0]:
@@ -2315,7 +2258,7 @@ class WifiSaveCredentialRequest(BaseModel):
 @app.get("/wifi/credentials")
 def get_saved_wifi_credentials():
     credentials = {}
-    with sqlite3.connect(DB_PATH) as conn:
+    with get_db(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         cursor = conn.execute("SELECT ssid, password, updated_at FROM wifi_credentials")
         for row in cursor:
@@ -2331,7 +2274,7 @@ def save_wifi_credential(req: WifiSaveCredentialRequest):
     if not req.ssid or not req.password:
         raise HTTPException(status_code=400, detail="SSID and password cannot be empty.")
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    with sqlite3.connect(DB_PATH) as conn:
+    with get_db(DB_PATH) as conn:
         conn.execute('''
             INSERT INTO wifi_credentials (ssid, password, updated_at)
             VALUES (?, ?, ?)
@@ -2354,7 +2297,7 @@ def connect_wifi(req: WifiConnectRequest):
     # Save credential permanently to DB
     try:
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_db(DB_PATH) as conn:
             conn.execute('''
                 INSERT INTO wifi_credentials (ssid, password, updated_at)
                 VALUES (?, ?, ?)
@@ -2473,7 +2416,7 @@ def enrich_scan_results(scan_result: dict) -> dict:
 
     # 1. Query SQLite audits.db
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_db(DB_PATH) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.execute("SELECT mac_address, computer_name, os_name, execution_datetime, audit_data FROM device_audits ORDER BY id DESC")
             for row in cursor:
@@ -2779,7 +2722,7 @@ class LifecycleData(BaseModel):
 
 @app.get("/api/lifecycle/{mac_address}")
 def get_lifecycle(mac_address: str):
-    with sqlite3.connect(DB_PATH) as conn:
+    with get_db(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         row = conn.execute("SELECT * FROM asset_lifecycle WHERE mac_address=?", (mac_address,)).fetchone()
     if row:
@@ -2790,7 +2733,7 @@ def get_lifecycle(mac_address: str):
 @app.post("/api/lifecycle")
 def save_lifecycle(data: LifecycleData):
     now = datetime.now().isoformat()
-    with sqlite3.connect(DB_PATH) as conn:
+    with get_db(DB_PATH) as conn:
         conn.execute('''
             INSERT INTO asset_lifecycle
                 (mac_address, computer_name, owner, vendor, status, warranty_start, warranty_end,
@@ -2822,7 +2765,7 @@ class TicketData(BaseModel):
 
 @app.get("/api/tickets/{mac_address}")
 def get_tickets(mac_address: str):
-    with sqlite3.connect(DB_PATH) as conn:
+    with get_db(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute("SELECT * FROM asset_tickets WHERE mac_address=? ORDER BY created_at DESC", (mac_address,)).fetchall()
     return [dict(r) for r in rows]
@@ -2831,7 +2774,7 @@ def get_tickets(mac_address: str):
 @app.post("/api/tickets")
 def create_ticket(data: TicketData):
     now = datetime.now().isoformat()
-    with sqlite3.connect(DB_PATH) as conn:
+    with get_db(DB_PATH) as conn:
         conn.execute('''
             INSERT INTO asset_tickets (mac_address, computer_name, ticket_number, summary, status, assigned, priority, mtbf, created_at, updated_at)
             VALUES (?,?,?,?,?,?,?,?,?,?)
@@ -2844,7 +2787,7 @@ def create_ticket(data: TicketData):
 @app.put("/api/tickets/{ticket_id}")
 def update_ticket(ticket_id: int, data: TicketData):
     now = datetime.now().isoformat()
-    with sqlite3.connect(DB_PATH) as conn:
+    with get_db(DB_PATH) as conn:
         conn.execute('''
             UPDATE asset_tickets SET summary=?, status=?, assigned=?, priority=?, mtbf=?, updated_at=?
             WHERE id=?
@@ -2855,7 +2798,7 @@ def update_ticket(ticket_id: int, data: TicketData):
 
 @app.delete("/api/tickets/{ticket_id}")
 def delete_ticket(ticket_id: int):
-    with sqlite3.connect(DB_PATH) as conn:
+    with get_db(DB_PATH) as conn:
         conn.execute("DELETE FROM asset_tickets WHERE id=?", (ticket_id,))
         conn.commit()
     return {"status": "deleted"}
@@ -2872,7 +2815,7 @@ class OsqueryQueryRequest(BaseModel):
 
 @app.get("/api/settings/engine")
 def get_audit_engine():
-    with sqlite3.connect(DB_PATH) as conn:
+    with get_db(DB_PATH) as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT value FROM portal_settings WHERE key='audit_engine'")
         row = cursor.fetchone()
@@ -2891,11 +2834,61 @@ def set_audit_engine(data: AuditEngineRequest):
     if mode not in ["native", "osquery"]:
         raise HTTPException(status_code=400, detail="Invalid engine. Must be 'native' or 'osquery'.")
     
-    with sqlite3.connect(DB_PATH) as conn:
+    with get_db(DB_PATH) as conn:
         conn.execute("INSERT OR REPLACE INTO portal_settings (key, value) VALUES ('audit_engine', ?)", (mode,))
         conn.commit()
     
     return {"status": "success", "audit_engine": mode}
+
+@app.get("/api/settings/database")
+def get_db_engine():
+    """Get current database engine and available options. Reloads .env on every call."""
+    import os as _os
+    try:
+        from dotenv import load_dotenv
+        load_dotenv(override=True)  # always re-read .env — picks up changes without restart
+    except ImportError:
+        pass
+    pg_host     = _os.getenv("PG_HOST", "")
+    pg_database = _os.getenv("PG_DATABASE", "")
+    active      = get_active_engine()
+    env_override = bool(_os.getenv("DB_ENGINE", ""))
+    pg_configured = bool(pg_host and pg_database)
+    return {
+        "active_engine":      active,
+        "env_override":       env_override,
+        "pg_configured":      pg_configured,
+        "psycopg2_available": _psycopg2_available,
+        "pg_host":            pg_host or None,
+        "pg_database":        pg_database or None,
+    }
+
+class DbEngineRequest(BaseModel):
+    engine: str  # "sqlite" or "postgres"
+
+@app.post("/api/settings/database")
+def set_db_engine(data: DbEngineRequest):
+    """Switch database engine at runtime (saved to db_config.json). Reloads .env first."""
+    import os as _os
+    try:
+        from dotenv import load_dotenv
+        load_dotenv(override=True)
+    except ImportError:
+        pass
+    pg_host     = _os.getenv("PG_HOST", "")
+    pg_database = _os.getenv("PG_DATABASE", "")
+    mode = data.engine.lower().strip()
+    if mode not in ["sqlite", "postgres"]:
+        raise HTTPException(status_code=400, detail="Invalid engine. Must be 'sqlite' or 'postgres'.")
+    if mode == "postgres" and not _psycopg2_available:
+        raise HTTPException(status_code=400, detail="psycopg2 is not installed on this server.")
+    if mode == "postgres" and not (pg_host and pg_database):
+        raise HTTPException(status_code=400, detail="PostgreSQL credentials not found in .env file. Add PG_HOST and PG_DATABASE.")
+    env_override = bool(_os.getenv("DB_ENGINE", ""))
+    if env_override:
+        raise HTTPException(status_code=400, detail="DB_ENGINE env var is set — remove it to allow UI switching.")
+    write_db_config(mode)
+    return {"status": "success", "active_engine": mode}
 
 @app.get("/api/osquery/status")
 def osquery_status():
@@ -3512,7 +3505,7 @@ def trigger_osquery_scan():
         exec_dt = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         payload["execution_datetime"] = exec_dt
 
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_db(DB_PATH) as conn:
             conn.execute('''
                 INSERT INTO device_audits (mac_address, computer_name, os_name, execution_datetime, audit_data)
                 VALUES (?, ?, ?, ?, ?)
